@@ -13,9 +13,9 @@ workflows:
         - traverse-secrets
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.traverse.app
+        bundle_identifier: com.youngapps.traverse
       vars:
-        BUNDLE_ID: com.traverse.app
+        BUNDLE_ID: com.youngapps.traverse
 
     scripts:
       - name: Install npm dependencies
