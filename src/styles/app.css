@@ -26,9 +26,15 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .auth-brand { font: 700 11px/1 var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: 4px; margin-bottom: 14px; }
 .auth-title { font: 400 34px/1.15 var(--font-display); color: var(--text); margin-bottom: 10px; }
 .auth-subtitle { font: 14px/1.6 var(--font-sans); color: var(--text-secondary); max-width: 280px; margin-bottom: 36px; }
-.auth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 24px; background: white; color: #1a1a1a; border: none; border-radius: 12px; font: 600 14px var(--font-sans); cursor: pointer; min-width: 240px; box-shadow: 0 2px 8px rgba(0,0,0,.2); transition: transform .15s, box-shadow .15s; }
+.auth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 24px; background: white; color: #1a1a1a; border: none; border-radius: 12px; font: 600 14px var(--font-sans); cursor: pointer; min-width: 240px; box-shadow: 0 2px 8px rgba(0,0,0,.2); transition: transform .15s, box-shadow .15s; margin-bottom: 10px; }
 .auth-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-btn-apple { background: #000; color: #fff; }
+.auth-btn-apple:hover { background: #1a1a1a; }
 .auth-error { margin-top: 14px; padding: 10px 16px; background: rgba(240,96,80,.1); border: 1px solid rgba(240,96,80,.25); border-radius: 10px; color: var(--red); font: 13px/1.5 var(--font-sans); max-width: 300px; }
+.auth-legal { margin-top: 18px; font: 11px/1.5 var(--font-sans); color: var(--text-dim); max-width: 260px; text-align: center; }
+.auth-legal a { color: var(--accent); text-decoration: none; }
+.auth-legal a:hover { text-decoration: underline; }
 .loading-text { font: 12px var(--font-mono); color: var(--text-dim); }
 
 /* Header */
@@ -42,7 +48,8 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .user-menu-info { padding: 10px 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .user-menu-name { font: 500 13px var(--font-sans); color: var(--text); }
 .user-menu-email { font: 11px var(--font-mono); color: var(--text-dim); margin-top: 2px; }
-.user-menu-item { display: block; width: 100%; padding: 10px 14px; background: none; border: none; color: var(--text-secondary); font: 13px var(--font-sans); text-align: left; cursor: pointer; border-radius: 8px; }
+.user-menu-item { display: block; width: 100%; padding: 10px 14px; background: none; border: none; color: var(--text-secondary); font: 13px var(--font-sans); text-align: left; cursor: pointer; border-radius: 8px; text-decoration: none; box-sizing: border-box; }
+.user-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
 .user-menu-item:hover { background: var(--surface-hover); }
 .user-menu-item.danger { color: var(--red); }
 
