@@ -1,0 +1,19 @@
+{
+  "appId": "com.traverse.app",
+  "appName": "Traverse",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "always"
+  },
+  "server": {
+    "allowNavigation": [
+      "*.mapbox.com",
+      "*.googleapis.com",
+      "*.firebase.com",
+      "*.firebaseio.com",
+      "*.firebaseapp.com",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.claude/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Capacitor
+ios/App/Pods/
+ios/.xcode.env.local
+

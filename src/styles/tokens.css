@@ -1,0 +1,43 @@
+:root {
+  /* Surfaces — lightened 15-20% from previous */
+  --bg: #0F1218;
+  --bg-2: #151A24;
+  --surface: #1A2030;
+  --surface-hover: #212838;
+  --surface-active: #283042;
+
+  /* Borders — stronger */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-active: rgba(255, 255, 255, 0.18);
+
+  /* Text — brighter, especially secondary/dim for readability */
+  --text: #EDF0F7;
+  --text-secondary: #A0AABE;
+  --text-dim: #6B7A92;
+
+  /* Accent */
+  --accent: #D4A44C;
+  --accent-muted: rgba(212, 164, 76, 0.12);
+  --accent-border: rgba(212, 164, 76, 0.28);
+
+  /* Status */
+  --green: #3DD68C;
+  --green-muted: rgba(61, 214, 140, 0.12);
+  --blue: #5AABF7;
+  --red: #F06050;
+
+  /* Type */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}

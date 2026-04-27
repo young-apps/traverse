@@ -1,0 +1,74 @@
+workflows:
+  ios-app-store:
+    name: iOS App Store
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      node: v20
+      # --- Secrets group ---
+      # Create a group called "traverse-secrets" in Codemagic dashboard:
+      # Teams → Environment variables → Create group
+      # Add every key from .env.example, plus the three App Store Connect keys below.
+      groups:
+        - traverse-secrets
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.traverse.app
+      vars:
+        BUNDLE_ID: com.traverse.app
+
+    scripts:
+      - name: Install npm dependencies
+        script: npm ci
+
+      - name: Write .env file
+        # No leading spaces inside EOF block — they would break the values
+        script: |
+          cat > .env <<EOF
+VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_STORAGE_BUCKET=$VITE_FIREBASE_STORAGE_BUCKET
+VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+VITE_GOOGLE_PLACES_KEY=$VITE_GOOGLE_PLACES_KEY
+EOF
+
+      - name: Build web app
+        script: npm run build
+
+      - name: Add iOS platform (Codemagic has CocoaPods — skips local requirement)
+        # This creates the ios/ Xcode project on the build machine.
+        # We run it every build since ios/ is not committed to git.
+        script: npx cap add ios
+
+      - name: Sync web assets into iOS project
+        script: npx cap sync ios
+
+      - name: Set up code signing
+        # Installs the certificate + provisioning profile you uploaded in
+        # Codemagic dashboard → Teams → Code signing → iOS
+        script: xcode-project use-profiles
+
+      - name: Build .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace ios/App/App.xcworkspace \
+            --scheme App
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        # Uses API key stored as env vars — no "integration" needed in the dashboard.
+        # Add these three to your traverse-secrets group in Codemagic:
+        #   APP_STORE_CONNECT_KEY_IDENTIFIER  → Key ID  (e.g. AB12CD34EF)
+        #   APP_STORE_CONNECT_ISSUER_ID       → Issuer ID (UUID from App Store Connect)
+        #   APP_STORE_CONNECT_PRIVATE_KEY     → Contents of the .p8 file (the whole text)
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
