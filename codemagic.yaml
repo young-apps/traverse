@@ -43,6 +43,12 @@ workflows:
       - name: Sync web assets into iOS project
         script: npx cap sync ios
 
+      - name: Set export compliance flag
+        # Declares the app uses only exempt encryption (HTTPS/standard
+        # iOS crypto). Skips the App Store Connect compliance prompt.
+        script: |
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+
       - name: Bump build number
         # App Store Connect rejects duplicate build numbers. Use Codemagic's
         # auto-incrementing $BUILD_NUMBER plus a +10 offset to skip past
