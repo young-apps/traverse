@@ -1,5 +1,5 @@
 // App — Traverse — fixed: no emoji loading, OAuth retry, edit support, restructured nav
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useStays } from "../hooks/useStays";
 import { useFriends } from "../hooks/useFriends";
@@ -8,7 +8,12 @@ import { saveUserProfile } from "../services/friends";
 import { requestNotificationPermission, scheduleStayNotifications } from "../services/notifications";
 import Auth from "./Auth";
 import Header from "./Header";
-import MapView from "./MapView";
+// MapView lazy-loaded — Mapbox GL spawns a Web Worker at module-eval time
+// which iOS WebView treats as cross-origin and throws an opaque "Script
+// error :0" that crashes the whole app *before the auth screen renders*.
+// Deferring the import means Mapbox doesn't load until a signed-in user
+// actually hits the home tab.
+const MapView = lazy(() => import("./MapView"));
 import StayList from "./StayList";
 import StayCard from "./StayCard";
 import AddStayModal from "./AddStayModal";
@@ -71,7 +76,9 @@ function Dashboard({ user }) {
       {/* ─── HOME ─── */}
       {tab === "home" && (
         <>
-          <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} />
+          <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
+            <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} />
+          </Suspense>
           {upcoming.length > 0 && (
             <div className="section">
               <div className="section-title">Upcoming Stays</div>
