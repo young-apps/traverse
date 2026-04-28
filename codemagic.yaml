@@ -43,6 +43,14 @@ workflows:
       - name: Sync web assets into iOS project
         script: npx cap sync ios
 
+      - name: Bump build number
+        # App Store Connect rejects duplicate build numbers. Use Codemagic's
+        # auto-incrementing $BUILD_NUMBER plus a +10 offset to skip past
+        # build 1 which was already uploaded.
+        script: |
+          cd ios/App
+          agvtool new-version -all $(($BUILD_NUMBER + 10))
+
       - name: Set up code signing
         # Installs the certificate + provisioning profile you uploaded in
         # Codemagic dashboard → Teams → Code signing → iOS
