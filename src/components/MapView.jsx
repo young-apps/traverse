@@ -1,6 +1,11 @@
 // MapView — interactive Mapbox map with tappable markers + clean popovers
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
+// Inline the Mapbox worker so it's same-origin in Capacitor's WebView.
+// Without this, the worker loads as a cross-origin script and throws
+// an opaque "Script error :0" that crashes the entire app.
+import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
+mapboxgl.workerClass = MapboxWorker;
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 

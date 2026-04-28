@@ -8,4 +8,9 @@ export default defineConfig({
     outDir: 'dist',
   },
   server: { port: 5173 },
+  // Exclude mapbox-gl from Vite pre-bundling — it manages its own worker
+  // and pre-bundling breaks the CSP worker import below.
+  optimizeDeps: {
+    exclude: ['mapbox-gl'],
+  },
 });
