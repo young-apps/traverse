@@ -1,16 +1,33 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-// On-device error overlay — replaces silent failures with visible diagnostics
-// when running on TestFlight where Safari Web Inspector is blocked.
+// On-device error overlay — renders a fixed-position banner above #root.
+// Critical: never clobber #root.innerHTML, since React owns that subtree
+// and overwriting it triggers a cascade of removeChild errors during the
+// next commit, masking whatever error actually fired first.
+const OVERLAY_ID = "__traverse_error_overlay";
 function showError(title, detail) {
-  const root = document.getElementById("root");
-  if (!root) return;
-  root.innerHTML = `
-    <div style="padding:24px;font:14px/1.5 -apple-system,sans-serif;color:#fff;background:#080B12;min-height:100vh;box-sizing:border-box;">
-      <div style="color:#f06050;font-weight:600;font-size:16px;margin-bottom:12px;">${title}</div>
-      <pre style="white-space:pre-wrap;word-break:break-word;background:#1a1d24;padding:12px;border-radius:8px;font:12px ui-monospace,monospace;color:#aaa;">${detail}</pre>
-    </div>`;
+  let overlay = document.getElementById(OVERLAY_ID);
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = OVERLAY_ID;
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;padding:24px;font:14px/1.5 -apple-system,sans-serif;color:#fff;background:#080B12;overflow:auto;box-sizing:border-box;";
+    document.body.appendChild(overlay);
+  }
+  // Append (not replace) so multiple errors stack — the first one is usually
+  // the most informative. Cap at 5 to avoid runaway growth.
+  if (overlay.childElementCount >= 5) return;
+  const block = document.createElement("div");
+  block.style.cssText = "margin-bottom:16px;";
+  const titleEl = document.createElement("div");
+  titleEl.style.cssText = "color:#f06050;font-weight:600;font-size:16px;margin-bottom:8px;";
+  titleEl.textContent = title;
+  const pre = document.createElement("pre");
+  pre.style.cssText = "white-space:pre-wrap;word-break:break-word;background:#1a1d24;padding:12px;border-radius:8px;font:12px ui-monospace,monospace;color:#aaa;margin:0;";
+  pre.textContent = detail;
+  block.appendChild(titleEl);
+  block.appendChild(pre);
+  overlay.appendChild(block);
 }
 
 function formatError(e) {
