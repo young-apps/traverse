@@ -9,6 +9,12 @@ workflows:
       # Create a group called "traverse-secrets" in Codemagic dashboard:
       # Teams → Environment variables → Create group
       # Add every key from .env.example, plus the three App Store Connect keys below.
+      #
+      # New keys required for native auth:
+      #   GOOGLE_REVERSED_CLIENT_ID  → e.g. com.googleusercontent.apps.123456-abc
+      #                                Get this from GoogleService-Info.plist (REVERSED_CLIENT_ID).
+      #   GOOGLE_SERVICE_INFO_PLIST  → entire contents of GoogleService-Info.plist
+      #                                (paste the whole XML — Codemagic stores it as a string).
       groups:
         - traverse-secrets
       ios_signing:
@@ -19,7 +25,9 @@ workflows:
 
     scripts:
       - name: Install npm dependencies
-        script: npm ci
+        # Use install (not ci) so newly-added native plugin packages
+        # don't fail when the lockfile hasn't been regenerated yet.
+        script: npm install
 
       - name: Write .env file
         script: |
@@ -41,7 +49,72 @@ workflows:
         script: npx cap add ios
 
       - name: Sync web assets into iOS project
+        # cap sync also runs `pod install` to pull in native plugin pods
+        # (FirebaseAuthentication, GoogleSignIn, etc.).
         script: npx cap sync ios
+
+      - name: Write GoogleService-Info.plist
+        # Native Google Sign-In needs this file alongside the app binary.
+        # Source the contents from a Codemagic env var so the file isn't
+        # committed to git.
+        script: |
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" > ios/App/App/GoogleService-Info.plist
+            echo "Wrote GoogleService-Info.plist ($(wc -c < ios/App/App/GoogleService-Info.plist) bytes)"
+          else
+            echo "WARNING: GOOGLE_SERVICE_INFO_PLIST env var is empty — Google Sign-In will fail at runtime"
+          fi
+
+      - name: Add Google Sign-In URL scheme to Info.plist
+        # The iOS Google Sign-In SDK validates the OAuth callback against a
+        # URL scheme registered in Info.plist. Without it, the sign-in flow
+        # never returns to the app.
+        script: |
+          PLIST=ios/App/App/Info.plist
+          if [ -z "$GOOGLE_REVERSED_CLIENT_ID" ]; then
+            echo "WARNING: GOOGLE_REVERSED_CLIENT_ID env var is empty — Google Sign-In will fail"
+          else
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $GOOGLE_REVERSED_CLIENT_ID" "$PLIST"
+            echo "Added URL scheme: $GOOGLE_REVERSED_CLIENT_ID"
+          fi
+
+      - name: Enable Safari Web Inspector on iOS 16.4+
+        # TestFlight builds normally block Safari Web Inspector. iOS 16.4+
+        # exposes WKWebView.isInspectable as an explicit opt-in. Patch
+        # AppDelegate.swift to flip it on so future TestFlight crashes can
+        # be inspected from a Mac.
+        script: |
+          DELEGATE=ios/App/App/AppDelegate.swift
+          if ! grep -q "isInspectable" "$DELEGATE"; then
+            python3 <<'PYEOF'
+          path = "ios/App/App/AppDelegate.swift"
+          with open(path, "r") as f:
+              content = f.read()
+          patch = """
+                  // Enable Safari Web Inspector for TestFlight debugging (iOS 16.4+).
+                  if #available(iOS 16.4, *) {
+                      if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController {
+                          bridgeVC.webView?.isInspectable = true
+                      }
+                  }
+          """
+          # Insert before the first 'return true' inside didFinishLaunchingWithOptions.
+          marker = "return true"
+          idx = content.find(marker)
+          if idx != -1:
+              content = content[:idx] + patch + "\n        " + content[idx:]
+              with open(path, "w") as f:
+                  f.write(content)
+              print("Patched AppDelegate.swift with isInspectable")
+          else:
+              print("Could not locate insertion point in AppDelegate.swift")
+          PYEOF
+          else
+            echo "AppDelegate.swift already patched"
+          fi
 
       - name: Set export compliance flag
         # Declares the app uses only exempt encryption (HTTPS/standard

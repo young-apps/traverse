@@ -12,7 +12,9 @@
     "cap:open": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^7.0.0",
     "@capacitor/core": "^7.6.2",
+    "@capacitor/google-auth": "^4.0.0",
     "@capacitor/ios": "^7.6.2",
     "firebase": "^10.13.0",
     "mapbox-gl": "^3.7.0",

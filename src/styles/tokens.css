@@ -1,29 +1,29 @@
 :root {
-  /* Surfaces — lightened 15-20% from previous */
-  --bg: #0F1218;
-  --bg-2: #151A24;
-  --surface: #1A2030;
-  --surface-hover: #212838;
-  --surface-active: #283042;
+  /* Surfaces — illuminated charcoal palette for high legibility */
+  --bg: #1A1D23;
+  --bg-2: #1F232B;
+  --surface: #282D39;
+  --surface-hover: #2F343F;
+  --surface-active: #353B47;
 
-  /* Borders — stronger */
-  --border: rgba(255, 255, 255, 0.07);
-  --border-hover: rgba(255, 255, 255, 0.12);
-  --border-active: rgba(255, 255, 255, 0.18);
+  /* Borders — bumped to maintain contrast against the lighter surfaces */
+  --border: rgba(255, 255, 255, 0.10);
+  --border-hover: rgba(255, 255, 255, 0.16);
+  --border-active: rgba(255, 255, 255, 0.24);
 
-  /* Text — brighter, especially secondary/dim for readability */
-  --text: #EDF0F7;
-  --text-secondary: #A0AABE;
-  --text-dim: #6B7A92;
+  /* Text — pure white primary, high-contrast secondary */
+  --text: #FFFFFF;
+  --text-secondary: #D1D5DB;
+  --text-dim: #9CA3AF;
 
   /* Accent */
   --accent: #D4A44C;
-  --accent-muted: rgba(212, 164, 76, 0.12);
-  --accent-border: rgba(212, 164, 76, 0.28);
+  --accent-muted: rgba(212, 164, 76, 0.16);
+  --accent-border: rgba(212, 164, 76, 0.36);
 
   /* Status */
   --green: #3DD68C;
-  --green-muted: rgba(61, 214, 140, 0.12);
+  --green-muted: rgba(61, 214, 140, 0.16);
   --blue: #5AABF7;
   --red: #F06050;
 

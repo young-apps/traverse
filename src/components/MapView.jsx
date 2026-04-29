@@ -44,7 +44,7 @@ export default function MapView({ stays, selectedId, onSelect }) {
     if (!mapboxgl.accessToken) { setError("Set VITE_MAPBOX_TOKEN in .env"); return; }
     try {
       const map = new mapboxgl.Map({
-        container: containerRef.current, style: "mapbox://styles/mapbox/dark-v11",
+        container: containerRef.current, style: "mapbox://styles/mapbox/light-v11",
         center: [10, 30], zoom: 1.5, attributionControl: false,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");

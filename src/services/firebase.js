@@ -1,11 +1,23 @@
 // Firebase initialization
-// Reads config from Vite environment variables (VITE_FIREBASE_*)
-// All keys must be set in your .env file.
+// Uses initializeAuth instead of getAuth so we can conditionally omit the
+// popupRedirectResolver on native platforms. The resolver is what triggers
+// Firebase Auth to load the cross-origin __/auth/iframe used for popup
+// signaling, which fails in Capacitor's WKWebView (capacitor://localhost
+// origin isn't in Firebase's authorized domains and the SDK throws errors
+// the WebView surfaces as opaque "Script error :0"). On web we keep the
+// resolver so the @capacitor-firebase/authentication plugin's web fallback
+// (signInWithPopup) continues to work for localhost dev.
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  initializeAuth,
+  indexedDBLocalPersistence,
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { Capacitor } from "@capacitor/core";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,14 +28,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Validate config before init — surfaces a clear error if .env isn't set up
 if (!firebaseConfig.apiKey) {
-  console.error(
-    "❌ Firebase config missing. Did you copy .env.example to .env and fill in your keys?"
-  );
+  console.error("Firebase config missing. Did you copy .env.example to .env and fill in your keys?");
 }
 
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+
+const isNative = Capacitor.isNativePlatform();
+
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  popupRedirectResolver: isNative ? undefined : browserPopupRedirectResolver,
+});
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
