@@ -60,11 +60,10 @@ window.addEventListener("unhandledrejection", (e) => {
     await import("./styles/app.css");
     const { default: App } = await import("./components/App.jsx");
 
-    createRoot(document.getElementById("root")).render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
+    // StrictMode disabled: it double-mounts components in dev, which trips
+    // up Mapbox's manual DOM management and surfaces a removeChild error
+    // that doesn't occur in production builds.
+    createRoot(document.getElementById("root")).render(<App />);
   } catch (e) {
     showError("Module load failed", formatError(e));
   }
