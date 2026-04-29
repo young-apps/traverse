@@ -18,6 +18,14 @@ export default defineConfig({
   base: './',  // required for Capacitor — assets must use relative paths
   build: {
     outDir: 'dist',
+    // Disable runtime modulepreload. Vite's __vitePreload helper injects
+    // <link rel="modulepreload" crossorigin> tags at runtime for dynamic
+    // import chunks. iOS WebView treats those as cross-origin (no
+    // Access-Control-Allow-Origin from capacitor://localhost) and redacts
+    // any error thrown by the preloaded module to "Script error. :0".
+    // Disabling entirely lets the browser handle dynamic imports natively
+    // without CORS-flagged preload hints.
+    modulePreload: false,
   },
   server: { port: 5173 },
   // Exclude mapbox-gl from Vite pre-bundling — it manages its own worker
