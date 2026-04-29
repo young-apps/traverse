@@ -1,6 +1,10 @@
 // MapView — interactive Mapbox map with tappable markers + clean popovers
 import { useEffect, useRef, useState, useCallback } from "react";
-import mapboxgl from "mapbox-gl";
+// Import from the ESM build path explicitly. mapbox-gl's package.json
+// resolves to a UMD bundle by default, and our optimizeDeps.exclude
+// (needed for the inline worker below) blocks Vite from rewriting that
+// UMD into ESM — leaving us with no `default` export at runtime.
+import mapboxgl from "mapbox-gl/dist/esm-min/mapbox-gl.js";
 // Inline the Mapbox worker so it's same-origin in Capacitor's WebView.
 // Without this, the worker loads as a cross-origin script and throws
 // an opaque "Script error :0" that crashes the entire app.
