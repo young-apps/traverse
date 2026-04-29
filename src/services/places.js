@@ -24,7 +24,7 @@ export async function searchHotels(query) {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": PLACES_KEY,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.addressComponents",
+          "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.addressComponents,places.photos.name",
       },
       body: JSON.stringify({
         textQuery: query,
@@ -63,6 +63,7 @@ function normalizePlace(place) {
     lat: place.location?.latitude || 0,
     lng: place.location?.longitude || 0,
     rating: place.rating || null,
+    photoName: place.photos?.[0]?.name || null,
     city,
     country,
   };

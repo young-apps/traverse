@@ -122,7 +122,8 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .stay-date-arrow { color: var(--text-dim); font-size: 12px; }
 .stay-date-year { font: 11px var(--font-mono); color: var(--text-dim); margin-left: 2px; }
 .stay-via { font: 10px var(--font-mono); margin-left: auto; padding: 1px 6px; border-radius: 4px; background: rgba(78,158,245,.06); border: 1px solid rgba(78,158,245,.12); color: var(--blue); }
-.stay-detail { margin-top: 12px; padding: 14px 16px; background: var(--bg-2); border-radius: 12px; border: 1px solid var(--border); animation: expandIn .25s ease; }
+.stay-detail { margin-top: 12px; padding: 14px 16px; background: var(--bg-2); border-radius: 12px; border: 1px solid var(--border); animation: expandIn .25s ease; overflow: hidden; }
+.stay-photo { display: block; width: calc(100% + 32px); height: 160px; object-fit: cover; margin: -14px -16px 14px -16px; background: var(--surface); }
 .detail-addr { font: 12px var(--font-mono); color: var(--text-secondary); margin-bottom: 8px; }
 .detail-addr-link { background: none; border: none; font: 12px var(--font-mono); color: var(--text-secondary); cursor: pointer; padding: 0; margin-bottom: 8px; display: block; text-align: left; }
 .detail-addr-link:hover { color: var(--accent); text-decoration: underline; }

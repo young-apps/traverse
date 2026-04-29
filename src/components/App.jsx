@@ -5,6 +5,7 @@ import { useStays } from "../hooks/useStays";
 import { useFriends } from "../hooks/useFriends";
 import { addStay, deleteStay, updateStay } from "../services/stays";
 import { saveUserProfile } from "../services/friends";
+import { cacheHotelPhoto } from "../services/photos";
 import { requestNotificationPermission, scheduleStayNotifications } from "../services/notifications";
 import Auth from "./Auth";
 import Header from "./Header";
@@ -54,8 +55,17 @@ function Dashboard({ user }) {
 
   const handleAdd = (data) => {
     const today = new Date().toISOString().split("T")[0];
-    addStay(user.uid, { ...data, status: data.checkOut >= today ? "upcoming" : "past" })
-      .then(() => { setJustAdded(data.hotel); setTimeout(() => setJustAdded(null), 3000); })
+    const { photoName, ...stayData } = data;
+    addStay(user.uid, { ...stayData, status: stayData.checkOut >= today ? "upcoming" : "past" })
+      .then((stayId) => {
+        setJustAdded(stayData.hotel);
+        setTimeout(() => setJustAdded(null), 3000);
+        if (photoName && stayId) {
+          cacheHotelPhoto(user.uid, stayId, photoName)
+            .then((photoUrl) => { if (photoUrl) updateStay(user.uid, stayId, { photoUrl }); })
+            .catch(console.error);
+        }
+      })
       .catch(console.error);
     setShowAdd(false);
   };

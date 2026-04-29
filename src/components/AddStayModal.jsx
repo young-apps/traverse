@@ -60,6 +60,7 @@ export default function AddStayModal({ onClose, onAdd }) {
     onAdd({
       hotel: selected.name, city: selected.city, country: selected.country,
       lat: selected.lat, lng: selected.lng, address: selected.address, placeId: selected.placeId || null,
+      photoName: selected.photoName || null,
       checkIn, checkOut, nights, rating: isPast ? rating : null,
       roomType: roomType || null, bedType: bedType || null, viewType: viewType || null,
       clubAccess: clubAccess || null, upgradeStatus: upgradeStatus || null,

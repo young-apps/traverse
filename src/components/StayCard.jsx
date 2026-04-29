@@ -45,6 +45,9 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
 
       {isSelected && (
         <div className="stay-detail">
+          {stay.photoUrl && (
+            <img className="stay-photo" src={stay.photoUrl} alt={stay.hotel} loading="lazy" />
+          )}
           {stay.address && (
             <button className="detail-addr-link" onClick={openInMaps}>
               {stay.address}
