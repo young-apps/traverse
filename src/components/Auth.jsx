@@ -19,7 +19,7 @@ export default function Auth() {
       } else if (e.code === "auth/network-request-failed") {
         setError("Network error. Check your connection and try again.");
       } else {
-        setError("Sign-in didn't go through. This sometimes happens — please try again.");
+        setError(`${e.code || "error"}: ${e.message || String(e)}`);
       }
     }
     setLoading(null);

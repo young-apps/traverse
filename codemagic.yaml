@@ -125,35 +125,35 @@ workflows:
           fi
 
       - name: Enable Safari Web Inspector on iOS 16.4+
-        # TestFlight builds normally block Safari Web Inspector. iOS 16.4+
-        # exposes WKWebView.isInspectable as an explicit opt-in. Patch
-        # AppDelegate.swift to flip it on so future TestFlight crashes can
-        # be inspected from a Mac.
+        # Patch AppDelegate.swift to set isInspectable on the WKWebView so
+        # Safari Web Inspector can attach to a TestFlight build.
+        # We target applicationDidBecomeActive (not didFinishLaunching) because
+        # Capacitor's bridge + rootViewController are fully wired by that point.
         script: |
           DELEGATE=ios/App/App/AppDelegate.swift
           if ! grep -q "isInspectable" "$DELEGATE"; then
             python3 <<'PYEOF'
           path = "ios/App/App/AppDelegate.swift"
-          with open(path, "r") as f:
+          with open(path) as f:
               content = f.read()
           patch = """
-                  // Enable Safari Web Inspector for TestFlight debugging (iOS 16.4+).
-                  if #available(iOS 16.4, *) {
-                      if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController {
-                          bridgeVC.webView?.isInspectable = true
-                      }
-                  }
+      func applicationDidBecomeActive(_ application: UIApplication) {
+          if #available(iOS 16.4, *) {
+              if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController {
+                  bridgeVC.webView?.isInspectable = true
+              }
+          }
+      }
           """
-          # Insert before the first 'return true' inside didFinishLaunchingWithOptions.
-          marker = "return true"
-          idx = content.find(marker)
+          # Insert the new method just before the closing brace of the class.
+          idx = content.rfind("}")
           if idx != -1:
-              content = content[:idx] + patch + "\n        " + content[idx:]
+              content = content[:idx] + patch + content[idx:]
               with open(path, "w") as f:
                   f.write(content)
               print("Patched AppDelegate.swift with isInspectable")
           else:
-              print("Could not locate insertion point in AppDelegate.swift")
+              print("Could not locate closing brace in AppDelegate.swift")
           PYEOF
           else
             echo "AppDelegate.swift already patched"
