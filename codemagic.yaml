@@ -48,6 +48,31 @@ workflows:
         # We run it every build since ios/ is not committed to git.
         script: npx cap add ios
 
+      - name: Generate iOS app icons
+        # Generates all required icon sizes from resources/icon.png (1024x1024).
+        script: npx @capacitor/assets generate --ios
+
+      - name: Add Sign in with Apple entitlement
+        # The Apple Sign-In entitlement must be present in the binary.
+        # Without it the OS hard-crashes the app on launch.
+        # We write the entitlements file here; Codemagic's use-profiles step
+        # merges it with the provisioning profile entitlements automatically.
+        script: |
+          ENTITLEMENTS=ios/App/App/App.entitlements
+          if [ ! -f "$ENTITLEMENTS" ]; then
+            cat > "$ENTITLEMENTS" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict/>
+          </plist>
+          PLIST
+          fi
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.applesignin array" "$ENTITLEMENTS" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.applesignin:0 string Default" "$ENTITLEMENTS" 2>/dev/null || true
+          echo "Entitlements:"
+          cat "$ENTITLEMENTS"
+
       - name: Sync web assets into iOS project
         # cap sync also runs `pod install` to pull in native plugin pods
         # (FirebaseAuthentication, GoogleSignIn, etc.).
