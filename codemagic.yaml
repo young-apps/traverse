@@ -70,8 +70,20 @@ workflows:
           fi
           /usr/libexec/PlistBuddy -c "Add :com.apple.developer.applesignin array" "$ENTITLEMENTS" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :com.apple.developer.applesignin:0 string Default" "$ENTITLEMENTS" 2>/dev/null || true
-          echo "Entitlements:"
+          echo "Entitlements file:"
           cat "$ENTITLEMENTS"
+          # Wire the entitlements file into the Xcode project build settings.
+          # cap add ios may not set CODE_SIGN_ENTITLEMENTS, so without this
+          # step the file exists on disk but Xcode never signs it into the binary.
+          ruby - <<'RUBY'
+          require 'xcodeproj'
+          proj = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+          proj.targets.find { |t| t.name == 'App' }&.build_configurations&.each do |config|
+            config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'App/App.entitlements'
+          end
+          proj.save
+          puts 'Set CODE_SIGN_ENTITLEMENTS = App/App.entitlements'
+          RUBY
 
       - name: Sync web assets into iOS project
         # cap sync also runs `pod install` to pull in native plugin pods
