@@ -124,41 +124,6 @@ workflows:
             echo "Added URL scheme: $GOOGLE_REVERSED_CLIENT_ID"
           fi
 
-      - name: Enable Safari Web Inspector on iOS 16.4+
-        # Patch AppDelegate.swift to set isInspectable on the WKWebView so
-        # Safari Web Inspector can attach to a TestFlight build.
-        # We target applicationDidBecomeActive (not didFinishLaunching) because
-        # Capacitor's bridge + rootViewController are fully wired by that point.
-        script: |
-          DELEGATE=ios/App/App/AppDelegate.swift
-          if ! grep -q "isInspectable" "$DELEGATE"; then
-            python3 <<'PYEOF'
-          path = "ios/App/App/AppDelegate.swift"
-          with open(path) as f:
-              content = f.read()
-          patch = (
-              "\n    func applicationDidBecomeActive(_ application: UIApplication) {\n"
-              "        if #available(iOS 16.4, *) {\n"
-              "            if let root = self.window?.rootViewController,\n"
-              "               let bridgeVC = root as? CAPBridgeViewController {\n"
-              "                bridgeVC.webView?.isInspectable = true\n"
-              "            }\n"
-              "        }\n"
-              "    }\n"
-          )
-          idx = content.rfind("}")
-          if idx != -1:
-              content = content[:idx] + patch + content[idx:]
-              with open(path, "w") as f:
-                  f.write(content)
-              print("Patched AppDelegate.swift with isInspectable")
-          else:
-              print("Could not locate closing brace in AppDelegate.swift")
-          PYEOF
-          else
-            echo "AppDelegate.swift already patched"
-          fi
-
       - name: Set export compliance flag
         # Declares the app uses only exempt encryption (HTTPS/standard
         # iOS crypto). Skips the App Store Connect compliance prompt.
