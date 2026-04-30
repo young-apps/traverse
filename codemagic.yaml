@@ -136,16 +136,16 @@ workflows:
           path = "ios/App/App/AppDelegate.swift"
           with open(path) as f:
               content = f.read()
-          patch = """
-      func applicationDidBecomeActive(_ application: UIApplication) {
-          if #available(iOS 16.4, *) {
-              if let bridgeVC = self.window?.rootViewController as? CAPBridgeViewController {
-                  bridgeVC.webView?.isInspectable = true
-              }
-          }
-      }
-          """
-          # Insert the new method just before the closing brace of the class.
+          patch = (
+              "\n    func applicationDidBecomeActive(_ application: UIApplication) {\n"
+              "        if #available(iOS 16.4, *) {\n"
+              "            if let root = self.window?.rootViewController,\n"
+              "               let bridgeVC = root as? CAPBridgeViewController {\n"
+              "                bridgeVC.webView?.isInspectable = true\n"
+              "            }\n"
+              "        }\n"
+              "    }\n"
+          )
           idx = content.rfind("}")
           if idx != -1:
               content = content[:idx] + patch + content[idx:]
