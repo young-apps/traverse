@@ -91,19 +91,19 @@ workflows:
             printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" > ios/App/App/GoogleService-Info.plist
             echo "Wrote GoogleService-Info.plist ($(wc -c < ios/App/App/GoogleService-Info.plist) bytes)"
             ruby - <<'RUBY'
-              require 'xcodeproj'
-              proj = Xcodeproj::Project.open('ios/App/App.xcodeproj')
-              target = proj.targets.find { |t| t.name == 'App' }
-              group = proj.main_group.find_subpath('App', false)
-              if group.files.any? { |f| f.path == 'GoogleService-Info.plist' }
-                puts "GoogleService-Info.plist already in project"
-              else
-                ref = group.new_reference('GoogleService-Info.plist')
-                target.add_resources([ref])
-                proj.save
-                puts "Added GoogleService-Info.plist to Copy Bundle Resources"
-              end
-            RUBY
+          require 'xcodeproj'
+          proj = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+          target = proj.targets.find { |t| t.name == 'App' }
+          group = proj.main_group.find_subpath('App', false)
+          if group.files.any? { |f| f.path == 'GoogleService-Info.plist' }
+            puts 'GoogleService-Info.plist already in project'
+          else
+            ref = group.new_reference('GoogleService-Info.plist')
+            target.add_resources([ref])
+            proj.save
+            puts 'Added GoogleService-Info.plist to Copy Bundle Resources'
+          end
+          RUBY
           else
             echo "WARNING: GOOGLE_SERVICE_INFO_PLIST env var is empty — Firebase will crash at launch"
           fi
