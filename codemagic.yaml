@@ -79,15 +79,33 @@ workflows:
         script: npx cap sync ios
 
       - name: Write GoogleService-Info.plist
-        # Native Google Sign-In needs this file alongside the app binary.
-        # Source the contents from a Codemagic env var so the file isn't
-        # committed to git.
+        # Native Firebase iOS SDK calls [FIRApp configure] on launch and
+        # hard-crashes if GoogleService-Info.plist is absent from the app
+        # bundle. Writing the file to disk is not enough — it must also be
+        # registered in Xcode's Copy Bundle Resources build phase so that
+        # Xcode actually copies it into the .ipa. We use the xcodeproj gem
+        # (ships with CocoaPods on every Codemagic macOS runner) to add the
+        # reference programmatically after cap add ios creates the project.
         script: |
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             printf '%s' "$GOOGLE_SERVICE_INFO_PLIST" > ios/App/App/GoogleService-Info.plist
             echo "Wrote GoogleService-Info.plist ($(wc -c < ios/App/App/GoogleService-Info.plist) bytes)"
+            ruby - <<'RUBY'
+              require 'xcodeproj'
+              proj = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+              target = proj.targets.find { |t| t.name == 'App' }
+              group = proj.main_group.find_subpath('App', false)
+              if group.files.any? { |f| f.path == 'GoogleService-Info.plist' }
+                puts "GoogleService-Info.plist already in project"
+              else
+                ref = group.new_reference('GoogleService-Info.plist')
+                target.add_resources([ref])
+                proj.save
+                puts "Added GoogleService-Info.plist to Copy Bundle Resources"
+              end
+            RUBY
           else
-            echo "WARNING: GOOGLE_SERVICE_INFO_PLIST env var is empty — Google Sign-In will fail at runtime"
+            echo "WARNING: GOOGLE_SERVICE_INFO_PLIST env var is empty — Firebase will crash at launch"
           fi
 
       - name: Add Google Sign-In URL scheme to Info.plist
