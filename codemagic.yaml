@@ -104,6 +104,7 @@ workflows:
         #   3. Verify after pod install that the flag actually landed in the
         #      generated Pods xcconfig — fail the build if it didn't.
         script: |
+          set -e   # fail step immediately if Ruby patch script errors
           cd ios/App
           ruby - <<'RUBY'
           path = 'Podfile'
@@ -121,7 +122,10 @@ workflows:
           end
 
           # 2. Inject our flag-setting logic INTO the existing post_install block
-          flag_logic = <<~LOGIC
+          # NOTE: <<~'LOGIC' (single-quoted delimiter) DISABLES Ruby string
+          # interpolation. We need this so #{flags} stays as literal text in
+          # the generated Podfile post_install block, NOT evaluated here.
+          flag_logic = <<~'LOGIC'
             installer.pods_project.targets.each do |t|
               if t.name == 'CapacitorFirebaseAuthentication'
                 t.build_configurations.each do |c|
