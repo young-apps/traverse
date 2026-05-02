@@ -42,7 +42,10 @@ export default function LeaderboardView({ user, stays, friends, friendStays }) {
   const me = { name: myName, initial: myName.charAt(0).toUpperCase(), photoURL: user.photoURL, isMe: true, stats: myStats };
 
   const all = [me, ...friends.map((f) => {
-    const stats = calcStats(friendStays[f.friendUid] || []);
+    // friendStays now stores { stays, shared }; non-opted-in friends get [].
+    const entry = friendStays[f.friendUid];
+    const list = Array.isArray(entry) ? entry : (entry?.stays || []);
+    const stats = calcStats(list);
     return { name: f.displayName?.split(" ")[0] || "Friend", initial: (f.displayName || "?").charAt(0), photoURL: f.photoURL, isMe: false, stats };
   })];
 

@@ -16,8 +16,14 @@ export function useFriends(uid) {
       setFriends(friendList);
       const staysMap = {};
       await Promise.all(friendList.map(async (f) => {
-        try { staysMap[f.friendUid] = await getFriendStays(f.friendUid); }
-        catch (e) { staysMap[f.friendUid] = []; }
+        try {
+          const res = await getFriendStays(f.friendUid);
+          // getFriendStays returns { stays, shared } — preserve both so the UI
+          // can distinguish "no stays yet" from "this friend hasn't opted in".
+          staysMap[f.friendUid] = res;
+        } catch (e) {
+          staysMap[f.friendUid] = { stays: [], shared: false };
+        }
       }));
       setFriendStays(staysMap);
       setLoading(false);
@@ -33,8 +39,11 @@ export function useFriends(uid) {
   const refreshFriendStays = useCallback(async () => {
     const staysMap = {};
     await Promise.all(friends.map(async (f) => {
-      try { staysMap[f.friendUid] = await getFriendStays(f.friendUid); }
-      catch (e) { staysMap[f.friendUid] = []; }
+      try {
+        staysMap[f.friendUid] = await getFriendStays(f.friendUid);
+      } catch (e) {
+        staysMap[f.friendUid] = { stays: [], shared: false };
+      }
     }));
     setFriendStays(staysMap);
   }, [friends]);

@@ -1,36 +1,36 @@
 :root {
-  /* Surfaces — illuminated charcoal palette for high legibility */
-  --bg: #1A1D23;
-  --bg-2: #1F232B;
-  --surface: #282D39;
-  --surface-hover: #2F343F;
-  --surface-active: #353B47;
+  /* Surfaces — bright, paper-like palette for high legibility */
+  --bg: #FFFFFF;
+  --bg-2: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-hover: #F2F4F7;
+  --surface-active: #E8ECF1;
 
-  /* Borders — bumped to maintain contrast against the lighter surfaces */
-  --border: rgba(255, 255, 255, 0.10);
-  --border-hover: rgba(255, 255, 255, 0.16);
-  --border-active: rgba(255, 255, 255, 0.24);
+  /* Borders — subtle ink lines on light surfaces */
+  --border: rgba(15, 23, 42, 0.08);
+  --border-hover: rgba(15, 23, 42, 0.14);
+  --border-active: rgba(15, 23, 42, 0.22);
 
-  /* Text — pure white primary, high-contrast secondary */
-  --text: #FFFFFF;
-  --text-secondary: #D1D5DB;
-  --text-dim: #9CA3AF;
+  /* Text — deep slate primary for readability */
+  --text: #0F172A;
+  --text-secondary: #475569;
+  --text-dim: #94A3B8;
 
-  /* Accent */
-  --accent: #D4A44C;
-  --accent-muted: rgba(212, 164, 76, 0.16);
-  --accent-border: rgba(212, 164, 76, 0.36);
+  /* Accent — modern indigo, replaces the heavy mustard */
+  --accent: #4F46E5;
+  --accent-muted: rgba(79, 70, 229, 0.10);
+  --accent-border: rgba(79, 70, 229, 0.28);
 
   /* Status */
-  --green: #3DD68C;
-  --green-muted: rgba(61, 214, 140, 0.16);
-  --blue: #5AABF7;
-  --red: #F06050;
+  --green: #10B981;
+  --green-muted: rgba(16, 185, 129, 0.12);
+  --blue: #0EA5E9;
+  --red: #EF4444;
 
-  /* Type */
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-mono: 'IBM Plex Mono', monospace;
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Type — clean sans-serif throughout */
+  --font-display: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Radii */
   --radius-sm: 8px;

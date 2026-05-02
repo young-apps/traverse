@@ -1,6 +1,6 @@
-// FriendsView — with privacy disclaimer
-import { useState } from "react";
-import { findUserByEmail, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend } from "../services/friends";
+// FriendsView — with privacy disclaimer + opt-in stay-sharing toggle
+import { useState, useEffect } from "react";
+import { findUserByEmail, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
 
 const fmt = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const fmtS = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
@@ -11,6 +11,27 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [expandedFriend, setExpandedFriend] = useState(null);
+  // Sharing is OFF by default — users explicitly opt in to expose their stays.
+  const [sharing, setSharing] = useState(false);
+  const [savingShare, setSavingShare] = useState(false);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    getUserProfile(user.uid)
+      .then((p) => setSharing(p?.shareStaysWithFriends === true))
+      .catch(() => setSharing(false));
+  }, [user?.uid]);
+
+  const toggleSharing = async () => {
+    const next = !sharing;
+    setSavingShare(true);
+    try {
+      await setShareStaysWithFriends(user.uid, next);
+      setSharing(next);
+      onRefresh && onRefresh();
+    } catch (e) { console.error("toggle sharing failed", e); }
+    setSavingShare(false);
+  };
 
   const handleSendRequest = async () => {
     if (!email.trim()) return;
@@ -44,14 +65,40 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
   return (
     <div style={{ padding: "0 20px 40px" }}>
 
-      {/* Privacy disclaimer */}
+      {/* Privacy / sharing opt-in — defaults to OFF */}
       <div style={{
-        padding: "12px 16px", borderRadius: 12, marginBottom: 16,
-        background: "rgba(78,158,245,0.06)", border: "1px solid rgba(78,158,245,0.15)",
-        font: "12px/1.5 var(--font-sans)", color: "var(--text-secondary)",
+        padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+        background: "var(--surface)", border: "1px solid var(--border)",
+        display: "flex", alignItems: "flex-start", gap: 12,
       }}>
-        <span style={{ font: "600 12px var(--font-sans)", color: "var(--blue)" }}>🔒 Privacy note: </span>
-        When you add a friend, they can see your past and upcoming stays including hotel names, cities, and dates. They cannot see your costs, loyalty numbers, or private notes. You can remove a friend at any time.
+        <div style={{ flex: 1 }}>
+          <div style={{ font: "600 13px var(--font-sans)", color: "var(--text)", marginBottom: 4 }}>
+            Share my stays with friends
+          </div>
+          <div style={{ font: "12px/1.5 var(--font-sans)", color: "var(--text-secondary)" }}>
+            {sharing
+              ? "Friends can see your past and upcoming stays (hotel names, cities, dates). Costs, loyalty numbers, and notes stay private."
+              : "Your stays are private. Turn this on to let friends see your hotel names, cities, and dates. Costs and notes are never shared."}
+          </div>
+        </div>
+        <button
+          onClick={toggleSharing}
+          disabled={savingShare}
+          aria-pressed={sharing}
+          aria-label="Toggle stay sharing"
+          style={{
+            position: "relative", width: 44, height: 26, flexShrink: 0,
+            borderRadius: 999, border: "none", cursor: savingShare ? "wait" : "pointer",
+            background: sharing ? "var(--accent)" : "var(--surface-active)",
+            transition: "background .15s",
+          }}
+        >
+          <span style={{
+            position: "absolute", top: 3, left: sharing ? 21 : 3,
+            width: 20, height: 20, borderRadius: "50%", background: "#FFFFFF",
+            boxShadow: "0 1px 3px rgba(15,23,42,.25)", transition: "left .15s",
+          }} />
+        </button>
       </div>
 
       {/* Incoming requests */}
@@ -103,7 +150,11 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
         </div>
       ) : (
         friends.map((friend) => {
-          const stays = friendStays[friend.friendUid] || [];
+          // friendStays now stores { stays, shared } — fall back gracefully
+          // if any old shape leaks through.
+          const entry = friendStays[friend.friendUid];
+          const shared = entry && typeof entry === "object" && !Array.isArray(entry) ? entry.shared : true;
+          const stays = Array.isArray(entry) ? entry : (entry?.stays || []);
           const isExpanded = expandedFriend === friend.friendUid;
           const upcoming = stays.filter((s) => s.status === "upcoming");
           const past = stays.filter((s) => s.status === "past");
@@ -116,21 +167,32 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
                 <div style={{ flex: 1 }}>
                   <div style={{ font: "500 14px var(--font-sans)", color: "var(--text)" }}>{friend.displayName || friend.email}</div>
                   <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>
-                    {stays.length} stay{stays.length !== 1 ? "s" : ""}
-                    {upcoming.length > 0 && <span style={{ color: "var(--green)" }}> · {upcoming.length} upcoming</span>}
+                    {!shared ? (
+                      <span>Stays private</span>
+                    ) : (
+                      <>
+                        {stays.length} stay{stays.length !== 1 ? "s" : ""}
+                        {upcoming.length > 0 && <span style={{ color: "var(--green)" }}> · {upcoming.length} upcoming</span>}
+                      </>
+                    )}
                   </div>
                 </div>
                 <span style={{ font: "14px var(--font-sans)", color: "var(--text-dim)", transition: "transform 0.2s", transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
               </div>
               {isExpanded && (
                 <div style={{ borderTop: "1px solid var(--border)" }}>
-                  {upcoming.length > 0 && (
+                  {!shared && (
+                    <div style={{ padding: "16px", font: "12px/1.5 var(--font-sans)", color: "var(--text-secondary)", background: "var(--bg-2)" }}>
+                      This friend hasn't opted in to share their stays. Only they can change that from their own privacy settings.
+                    </div>
+                  )}
+                  {shared && upcoming.length > 0 && (
                     <div style={{ padding: "12px 16px", background: "var(--green-muted)" }}>
                       <div style={{ font: "600 10px var(--font-mono)", color: "var(--green)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Upcoming</div>
                       {upcoming.map((s) => <div key={s.id} style={{ padding: "6px 0" }}><div style={{ font: "500 13px var(--font-sans)", color: "var(--text)" }}>{s.hotel}</div><div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>{s.city} · {fmt(s.checkIn)} → {fmt(s.checkOut)}</div></div>)}
                     </div>
                   )}
-                  {past.length > 0 && (
+                  {shared && past.length > 0 && (
                     <div style={{ padding: "12px 16px" }}>
                       <div style={{ font: "600 10px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Past</div>
                       {past.slice(0, 10).map((s) => (

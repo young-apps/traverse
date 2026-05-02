@@ -29,8 +29,9 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
           </div>
         </div>
         <div className="stay-right">
-          {up ? <div className="stay-upcoming-badge">Upcoming</div>
-            : stay.rating ? <div className="stay-rating">{"★".repeat(stay.rating)}<span className="stay-rating-empty">{"★".repeat(5 - stay.rating)}</span></div> : null}
+          {!up && stay.rating ? (
+            <div className="stay-rating">{"★".repeat(stay.rating)}<span className="stay-rating-empty">{"★".repeat(5 - stay.rating)}</span></div>
+          ) : null}
           <div className="stay-nights">{stay.nights}n</div>
         </div>
       </div>

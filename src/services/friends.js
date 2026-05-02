@@ -12,10 +12,27 @@ import {
 import { db } from "./firebase";
 
 // ── Profile ──
+// NOTE: shareStaysWithFriends defaults to FALSE — users must explicitly opt
+// in before any of their stays are exposed to friends via getFriendStays().
 export function saveUserProfile(user) {
   return setDoc(
     doc(db, "users", user.uid, "profile", "main"),
     { uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "", updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+/** Read the current user's profile (used to reflect privacy preferences). */
+export async function getUserProfile(uid) {
+  const snap = await getDoc(doc(db, "users", uid, "profile", "main"));
+  return snap.exists() ? snap.data() : null;
+}
+
+/** Toggle whether friends can see this user's stays. */
+export function setShareStaysWithFriends(uid, enabled) {
+  return setDoc(
+    doc(db, "users", uid, "profile", "main"),
+    { shareStaysWithFriends: !!enabled, updatedAt: serverTimestamp() },
     { merge: true }
   );
 }
@@ -93,7 +110,17 @@ export function subscribeToFriends(uid, callback) {
 }
 
 export async function getFriendStays(friendUid) {
+  // Privacy gate: only return stays if the friend has opted in to sharing.
+  // Default (no flag set) is treated as OFF — opt-in only.
+  try {
+    const profileSnap = await getDoc(doc(db, "users", friendUid, "profile", "main"));
+    const optedIn = profileSnap.exists() && profileSnap.data().shareStaysWithFriends === true;
+    if (!optedIn) return { stays: [], shared: false };
+  } catch (e) {
+    // If we can't verify consent, default closed.
+    return { stays: [], shared: false };
+  }
   const q = query(collection(db, "users", friendUid, "stays"), orderBy("checkIn", "desc"));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return { stays: snapshot.docs.map((d) => ({ id: d.id, ...d.data() })), shared: true };
 }
