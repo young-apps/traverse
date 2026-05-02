@@ -91,60 +91,62 @@ workflows:
         script: npx cap sync ios
 
       - name: Enable Google Sign-In via post_install hook
-        # @capacitor-firebase/authentication ships three subspecs:
-        #   - Lite (default)  : just FirebaseAuth — Apple Sign-In works because
-        #                        it uses Apple's built-in AuthenticationServices
-        #                        (no pod needed).
-        #   - Google          : adds GoogleSignIn 7.1.0 + -DRGCFA_INCLUDE_GOOGLE
-        #                        Swift flag that activates Google code paths
-        #                        gated by `#if RGCFA_INCLUDE_GOOGLE` in the
-        #                        plugin's source.
-        # Switching the plugin to the Google subspec broke Capacitor's plugin
-        # registration (UNIMPLEMENTED at runtime). So instead, we keep the
-        # plugin on Lite (known-working Capacitor integration) and manually:
+        # The plugin gates ALL Google code in `#if RGCFA_INCLUDE_GOOGLE`. Without
+        # the flag the signIn method body is empty — no UI, no callback, just a
+        # silent return that surfaces as the JS-side 30-second timeout.
+        #
+        # We keep the plugin on its default Lite subspec (Capacitor's @objc
+        # plugin registration works there — Apple Sign-In is the proof) and:
         #   1. Add GoogleSignIn 7.1.0 pod to the App target
-        #   2. Inject -DRGCFA_INCLUDE_GOOGLE via a post_install hook so the
-        #      plugin's Google handler compiles in.
-        # This is fully equivalent to the Google subspec but avoids the
-        # framework-naming change that breaks @objc registration.
+        #   2. MERGE flag-injection logic into Capacitor's existing
+        #      post_install block (defining a second post_install would
+        #      override Capacitor's, breaking deployment-target enforcement)
+        #   3. Verify after pod install that the flag actually landed in the
+        #      generated Pods xcconfig — fail the build if it didn't.
         script: |
           cd ios/App
           ruby - <<'RUBY'
           path = 'Podfile'
           content = File.read(path)
 
-          # 1. Add `pod 'GoogleSignIn', '7.1.0'` inside the App target if not already there
+          # 1. Add GoogleSignIn pod to App target
           unless content.include?("pod 'GoogleSignIn'")
             content = content.sub(
               /(target 'App' do\s*\n\s*capacitor_pods)/,
               "\\1\n  pod 'GoogleSignIn', '7.1.0'"
             )
-            puts "Added GoogleSignIn pod to App target"
+            abort "Could not find 'target App do' block to add GoogleSignIn pod" \
+              unless content.include?("pod 'GoogleSignIn'")
+            puts "Added GoogleSignIn pod"
           end
 
-          # 2. Add a post_install hook that injects -DRGCFA_INCLUDE_GOOGLE into
-          #    the CapacitorFirebaseAuthentication pod's Swift compile flags.
-          unless content.include?("RGCFA_INCLUDE_GOOGLE")
-            hook = <<~POSTINSTALL
-
-              post_install do |installer|
-                installer.pods_project.targets.each do |t|
-                  if t.name == 'CapacitorFirebaseAuthentication'
-                    t.build_configurations.each do |config|
-                      existing = config.build_settings['OTHER_SWIFT_FLAGS'] || '$(inherited)'
-                      unless existing.include?('-DRGCFA_INCLUDE_GOOGLE')
-                        config.build_settings['OTHER_SWIFT_FLAGS'] = "#{existing} -DRGCFA_INCLUDE_GOOGLE"
-                      end
-                    end
+          # 2. Inject our flag-setting logic INTO the existing post_install block
+          flag_logic = <<~LOGIC
+            installer.pods_project.targets.each do |t|
+              if t.name == 'CapacitorFirebaseAuthentication'
+                t.build_configurations.each do |c|
+                  flags = c.build_settings['OTHER_SWIFT_FLAGS'] || '$(inherited)'
+                  unless flags.include?('-DRGCFA_INCLUDE_GOOGLE')
+                    c.build_settings['OTHER_SWIFT_FLAGS'] = "#{flags} -DRGCFA_INCLUDE_GOOGLE"
                   end
                 end
+                puts "[post_install] applied -DRGCFA_INCLUDE_GOOGLE"
               end
-            POSTINSTALL
+            end
+          LOGIC
 
-            # Replace any existing post_install (Capacitor may have one) by
-            # appending ours — both will run if structured as separate blocks.
-            content += hook
-            puts "Added post_install hook for -DRGCFA_INCLUDE_GOOGLE"
+          unless content.include?('RGCFA_INCLUDE_GOOGLE')
+            if content =~ /post_install do \|installer\|/
+              # Inject right after the opening line of the existing block
+              content.sub!(
+                /(post_install do \|installer\|\s*\n)/,
+                "\\1#{flag_logic.lines.map { |l| "  #{l}" }.join}"
+              )
+              puts "Merged flag logic into existing post_install"
+            else
+              content += "\npost_install do |installer|\n#{flag_logic}end\n"
+              puts "Created new post_install block"
+            end
           end
 
           File.write(path, content)
@@ -153,8 +155,20 @@ workflows:
           cat Podfile
           echo "-------------------------------"
           pod install
-          echo "----- Pods installed -----"
-          grep -E "CapacitorFirebaseAuthentication|GoogleSignIn" Podfile.lock | sort -u
+          echo ""
+          echo "===== VERIFY: -DRGCFA_INCLUDE_GOOGLE in plugin xcconfig ====="
+          XCCONFIG_DIR="Pods/Target Support Files/CapacitorFirebaseAuthentication"
+          if grep -r "RGCFA_INCLUDE_GOOGLE" "$XCCONFIG_DIR" 2>/dev/null; then
+            echo "✅ Flag is present in the generated xcconfig"
+          else
+            echo "❌ Flag MISSING — Google Sign-In will not work"
+            echo "Contents of $XCCONFIG_DIR:"
+            ls -la "$XCCONFIG_DIR" 2>/dev/null || echo "(directory not found)"
+            echo ""
+            echo "OTHER_SWIFT_FLAGS in xcconfig files:"
+            grep -h "OTHER_SWIFT_FLAGS" "$XCCONFIG_DIR"/*.xcconfig 2>/dev/null
+            exit 1
+          fi
 
       - name: Write GoogleService-Info.plist
         # Native Firebase iOS SDK calls [FIRApp configure] on launch and
