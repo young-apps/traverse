@@ -29,6 +29,49 @@ workflows:
         # don't fail when the lockfile hasn't been regenerated yet.
         script: npm install
 
+      - name: Patch FirebaseAuthentication podspec to enable Google Sign-In
+        # @capacitor-firebase/authentication ships with a `Lite` default
+        # subspec that excludes GoogleSignIn entirely (and its `Google`
+        # subspec hardcodes GoogleSignIn 7.1.0, which conflicts with
+        # GTMSessionFetcher 4.x pulled in by Firebase 11). We patch the
+        # plugin's podspec in node_modules so the Lite subspec itself:
+        #   1. Depends on GoogleSignIn ~> 8.0  (compatible with Firebase 11)
+        #   2. Sets -DRGCFA_INCLUDE_GOOGLE in OTHER_SWIFT_FLAGS so the
+        #      plugin's #if-gated Google handler compiles in
+        # This is functionally equivalent to using the Google subspec but
+        # avoids both the GoogleSignIn version conflict AND the framework-
+        # naming change that breaks Capacitor's plugin auto-registration.
+        # Must run BEFORE `cap sync ios` so the modified podspec is what
+        # CocoaPods sees during pod install.
+        script: |
+          set -e
+          PODSPEC=node_modules/@capacitor-firebase/authentication/CapacitorFirebaseAuthentication.podspec
+          if grep -q "GoogleSignIn" "$PODSPEC" && grep -q "RGCFA_INCLUDE_GOOGLE.*Lite\|Lite.*RGCFA_INCLUDE_GOOGLE" "$PODSPEC"; then
+            echo "Podspec already patched"
+          else
+            ruby - <<'RUBY'
+            path = ENV['PODSPEC'] || 'node_modules/@capacitor-firebase/authentication/CapacitorFirebaseAuthentication.podspec'
+            content = File.read(path)
+            new_lite = <<~'BLOCK'
+              s.subspec 'Lite' do |lite|
+                lite.dependency 'GoogleSignIn', '~> 8.0'
+                lite.xcconfig = { 'OTHER_SWIFT_FLAGS' => '$(inherited) -DRGCFA_INCLUDE_GOOGLE' }
+              end
+            BLOCK
+            patched = content.sub(
+              /s\.subspec 'Lite' do \|lite\|.*?end/m,
+              new_lite.strip
+            )
+            if patched == content
+              abort "Could not find 'Lite' subspec block in podspec — plugin may have changed structure"
+            end
+            File.write(path, patched)
+            puts "Patched Lite subspec to include GoogleSignIn 8.x + RGCFA_INCLUDE_GOOGLE flag"
+          RUBY
+          fi
+          echo "----- Patched podspec (Lite subspec) -----"
+          grep -A3 "s.subspec 'Lite'" "$PODSPEC"
+
       - name: Write .env file
         script: |
           echo "VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY" > .env
@@ -90,93 +133,34 @@ workflows:
         # (FirebaseAuthentication, GoogleSignIn, etc.).
         script: npx cap sync ios
 
-      - name: Enable Google Sign-In via post_install hook
-        # The plugin gates ALL Google code in `#if RGCFA_INCLUDE_GOOGLE`. Without
-        # the flag the signIn method body is empty — no UI, no callback, just a
-        # silent return that surfaces as the JS-side 30-second timeout.
-        #
-        # We keep the plugin on its default Lite subspec (Capacitor's @objc
-        # plugin registration works there — Apple Sign-In is the proof) and:
-        #   1. Add GoogleSignIn 7.1.0 pod to the App target
-        #   2. MERGE flag-injection logic into Capacitor's existing
-        #      post_install block (defining a second post_install would
-        #      override Capacitor's, breaking deployment-target enforcement)
-        #   3. Verify after pod install that the flag actually landed in the
-        #      generated Pods xcconfig — fail the build if it didn't.
+      - name: Verify Google Sign-In is wired in
+        # The podspec patch (Patch FirebaseAuthentication podspec step) made
+        # the plugin's Lite subspec depend on GoogleSignIn ~> 8.0 and set
+        # -DRGCFA_INCLUDE_GOOGLE. After cap sync ran pod install, both should
+        # be visible:
+        #   - GoogleSignIn 8.x in Podfile.lock
+        #   - The flag in the plugin's generated xcconfig
+        # Fail the build if either is missing — that means the patch didn't
+        # take effect and we'd waste time on a broken archive.
         script: |
-          set -e   # fail step immediately if Ruby patch script errors
+          set -e
           cd ios/App
-          ruby - <<'RUBY'
-          path = 'Podfile'
-          content = File.read(path)
-
-          # 1. Add GoogleSignIn pod to App target.
-          #    We pin ~> 8.0 (NOT 7.1.0 like the plugin's Google subspec
-          #    declares) because Firebase 11.x pulls in GTMSessionFetcher 4.x,
-          #    and GoogleSignIn 7.x requires GTMSessionFetcher 3.x — irresolvable
-          #    conflict. GoogleSignIn 8.x requires GTMSessionFetcher 4.x and is
-          #    API-compatible with the plugin's Swift code (GIDConfiguration +
-          #    GIDSignIn.sharedInstance.signIn — unchanged across the 7→8 bump).
-          unless content.include?("pod 'GoogleSignIn'")
-            content = content.sub(
-              /(target 'App' do\s*\n\s*capacitor_pods)/,
-              "\\1\n  pod 'GoogleSignIn', '~> 8.0'"
-            )
-            abort "Could not find 'target App do' block to add GoogleSignIn pod" \
-              unless content.include?("pod 'GoogleSignIn'")
-            puts "Added GoogleSignIn pod (~> 8.0)"
-          end
-
-          File.write(path, content)
-          # NOTE: We deliberately do NOT modify the post_install block here.
-          # Modifying target.build_settings inside a Ruby post_install hook
-          # writes to project.pbxproj, which CocoaPods regenerates during
-          # subsequent operations and which is overridden by xcconfig anyway.
-          # We patch the generated xcconfig files directly in the bash step
-          # below — that's the precedence-correct place for the flag.
-          RUBY
-          echo "----- Podfile after patch -----"
-          cat Podfile
-          echo "-------------------------------"
-          # Force a fresh resolution — Podfile.lock from cap sync has
-          # GTMSessionFetcher locked to 4.5.0, which conflicts with the
-          # GoogleSignIn version we're now pinning. Without this, pod install
-          # tries to honor the lock and fails with an unresolvable conflict.
-          rm -f Podfile.lock
-          rm -rf Pods
-          pod install
-
+          echo "===== Pods related to Google Sign-In ====="
+          grep -E "GoogleSignIn|CapacitorFirebaseAuthentication" Podfile.lock | sort -u
           echo ""
-          echo "===== Inject -DRGCFA_INCLUDE_GOOGLE into plugin xcconfig ====="
-          # CocoaPods generates xcconfig files in
-          # Pods/Target Support Files/CapacitorFirebaseAuthentication/.
-          # These are the BASE configurations Xcode uses for the pod target,
-          # and they take precedence over project.pbxproj for inherited flags.
-          # We append -DRGCFA_INCLUDE_GOOGLE to OTHER_SWIFT_FLAGS in each one
-          # so the plugin's #if RGCFA_INCLUDE_GOOGLE Google handler compiles
-          # in. The plugin pod stays on its default Lite subspec — we're just
-          # toggling the compile-time flag that subspec would have set.
+          echo "===== OTHER_SWIFT_FLAGS in plugin xcconfig ====="
           XCCONFIG_DIR="Pods/Target Support Files/CapacitorFirebaseAuthentication"
-          for f in "$XCCONFIG_DIR"/*.xcconfig; do
-            if grep -q "RGCFA_INCLUDE_GOOGLE" "$f"; then
-              echo "Already patched: $f"
-            else
-              # macOS sed in-place needs an empty extension argument
-              sed -i '' 's|^OTHER_SWIFT_FLAGS = \(.*\)$|OTHER_SWIFT_FLAGS = \1 -DRGCFA_INCLUDE_GOOGLE|' "$f"
-              echo "Patched: $f"
-            fi
-          done
-
+          grep -h "OTHER_SWIFT_FLAGS" "$XCCONFIG_DIR"/*.xcconfig
           echo ""
-          echo "===== VERIFY ====="
-          if grep -h "RGCFA_INCLUDE_GOOGLE" "$XCCONFIG_DIR"/*.xcconfig; then
-            echo "✅ Flag present in plugin xcconfig"
-          else
-            echo "❌ Flag still MISSING after sed patch"
-            echo "Current OTHER_SWIFT_FLAGS lines:"
-            grep -h "OTHER_SWIFT_FLAGS" "$XCCONFIG_DIR"/*.xcconfig
+          if ! grep -q "RGCFA_INCLUDE_GOOGLE" "$XCCONFIG_DIR"/*.xcconfig; then
+            echo "❌ -DRGCFA_INCLUDE_GOOGLE missing — Google Sign-In handler will be empty"
             exit 1
           fi
+          if ! grep -q "GoogleSignIn" Podfile.lock; then
+            echo "❌ GoogleSignIn pod not in Podfile.lock"
+            exit 1
+          fi
+          echo "✅ Google Sign-In is wired in"
 
       - name: Write GoogleService-Info.plist
         # Native Firebase iOS SDK calls [FIRApp configure] on launch and
