@@ -16,19 +16,46 @@ import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signOut as fir
 import { Capacitor } from "@capacitor/core";
 import { auth } from "./firebase";
 
+// Wrap a promise so it rejects after `ms` instead of hanging forever.
+// Surfaces silent native-bridge stalls as a visible error in the UI.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {
-    // Native: get OAuth credential from iOS Google Sign-In SDK,
-    // exchange for Firebase credential, sign in to web SDK so
-    // onAuthStateChanged fires consistently.
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    console.log("[auth] Google: calling native plugin signInWithGoogle…");
+    let result;
+    try {
+      result = await withTimeout(
+        FirebaseAuthentication.signInWithGoogle(),
+        30000,
+        "Google native sign-in"
+      );
+    } catch (e) {
+      console.error("[auth] Google native step failed:", e);
+      throw e;
+    }
+    console.log("[auth] Google: native returned", {
+      hasIdToken: !!result?.credential?.idToken,
+      hasUser: !!result?.user,
+    });
     if (!result.credential?.idToken) throw new Error("Google sign-in returned no ID token");
+    console.log("[auth] Google: exchanging credential with Firebase JS SDK…");
     const credential = GoogleAuthProvider.credential(result.credential.idToken);
-    const userCred = await signInWithCredential(auth, credential);
+    const userCred = await withTimeout(
+      signInWithCredential(auth, credential),
+      20000,
+      "Firebase signInWithCredential (Google)"
+    );
+    console.log("[auth] Google: signed in, uid=", userCred.user.uid);
     return userCred.user;
   }
-  // Web: plugin uses Firebase Auth web SDK internally (signInWithPopup),
-  // which works on localhost because it's in authorized domains.
   const result = await FirebaseAuthentication.signInWithGoogle();
   return result.user;
 }
