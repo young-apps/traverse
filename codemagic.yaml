@@ -97,8 +97,11 @@ workflows:
         # signInWithGoogle() hangs forever with no UI.
         # Apple Sign-In works regardless because it uses Apple's built-in
         # AuthenticationServices framework (no pod needed).
-        # We patch the Podfile to request the Google subspec and re-run
-        # pod install so GoogleSignIn 7.1.0 is actually pulled in.
+        # We patch the Podfile to request the Google subspec and do a CLEAN
+        # pod install (delete Pods/ + Podfile.lock first) — switching
+        # subspecs on an existing install can leave the plugin half-linked,
+        # which manifests as "UNIMPLEMENTED: FirebaseAuthentication plugin
+        # is not implemented on ios" at runtime.
         script: |
           cd ios/App
           ruby - <<'RUBY'
@@ -121,7 +124,11 @@ workflows:
           echo "----- Podfile after patch -----"
           grep CapacitorFirebaseAuthentication Podfile
           echo "-------------------------------"
-          pod install
+          # Clean reinstall so the subspec change actually takes effect
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
+          echo "----- Verifying plugin is now built with Google subspec -----"
+          grep -E "CapacitorFirebaseAuthentication|GoogleSignIn" Podfile.lock | sort -u
 
       - name: Write GoogleService-Info.plist
         # Native Firebase iOS SDK calls [FIRApp configure] on launch and
