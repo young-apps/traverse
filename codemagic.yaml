@@ -151,6 +151,29 @@ workflows:
             fi
           fi
 
+      - name: Diagnose Google Sign-In setup
+        # Prints the bits that determine whether Google Sign-In can present
+        # its UI on iOS. Run a build, then read the Codemagic log for this
+        # step to verify each value is what we expect.
+        script: |
+          echo "===== GoogleService-Info.plist (source of truth) ====="
+          /usr/libexec/PlistBuddy -c "Print :CLIENT_ID"          ios/App/App/GoogleService-Info.plist
+          /usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/App/App/GoogleService-Info.plist
+          /usr/libexec/PlistBuddy -c "Print :BUNDLE_ID"          ios/App/App/GoogleService-Info.plist
+          echo ""
+          echo "===== Info.plist (must contain GIDClientID + URL scheme) ====="
+          /usr/libexec/PlistBuddy -c "Print :GIDClientID"        ios/App/App/Info.plist 2>/dev/null \
+            || echo "MISSING: GIDClientID"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes"   ios/App/App/Info.plist 2>/dev/null \
+            || echo "MISSING: CFBundleURLTypes"
+          echo ""
+          echo "===== Installed pod versions ====="
+          if [ -f ios/App/Podfile.lock ]; then
+            grep -E "^\s+- (GoogleSignIn|FirebaseAuth|CapacitorFirebaseAuthentication)" ios/App/Podfile.lock | sort -u
+          else
+            echo "Podfile.lock missing"
+          fi
+
       - name: Set export compliance flag
         # Declares the app uses only exempt encryption (HTTPS/standard
         # iOS crypto). Skips the App Store Connect compliance prompt.
