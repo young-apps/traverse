@@ -110,15 +110,21 @@ workflows:
           path = 'Podfile'
           content = File.read(path)
 
-          # 1. Add GoogleSignIn pod to App target
+          # 1. Add GoogleSignIn pod to App target.
+          #    We pin ~> 8.0 (NOT 7.1.0 like the plugin's Google subspec
+          #    declares) because Firebase 11.x pulls in GTMSessionFetcher 4.x,
+          #    and GoogleSignIn 7.x requires GTMSessionFetcher 3.x — irresolvable
+          #    conflict. GoogleSignIn 8.x requires GTMSessionFetcher 4.x and is
+          #    API-compatible with the plugin's Swift code (GIDConfiguration +
+          #    GIDSignIn.sharedInstance.signIn — unchanged across the 7→8 bump).
           unless content.include?("pod 'GoogleSignIn'")
             content = content.sub(
               /(target 'App' do\s*\n\s*capacitor_pods)/,
-              "\\1\n  pod 'GoogleSignIn', '7.1.0'"
+              "\\1\n  pod 'GoogleSignIn', '~> 8.0'"
             )
             abort "Could not find 'target App do' block to add GoogleSignIn pod" \
               unless content.include?("pod 'GoogleSignIn'")
-            puts "Added GoogleSignIn pod"
+            puts "Added GoogleSignIn pod (~> 8.0)"
           end
 
           # 2. Inject our flag-setting logic INTO the existing post_install block
@@ -158,6 +164,12 @@ workflows:
           echo "----- Podfile after patch -----"
           cat Podfile
           echo "-------------------------------"
+          # Force a fresh resolution — Podfile.lock from cap sync has
+          # GTMSessionFetcher locked to 4.5.0, which conflicts with the
+          # GoogleSignIn version we're now pinning. Without this, pod install
+          # tries to honor the lock and fails with an unresolvable conflict.
+          rm -f Podfile.lock
+          rm -rf Pods
           pod install
           echo ""
           echo "===== VERIFY: -DRGCFA_INCLUDE_GOOGLE in plugin xcconfig ====="
