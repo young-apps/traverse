@@ -1,12 +1,15 @@
 // Auth service — uses @capacitor-firebase/authentication for native iOS sign-in
 // (Google + Apple Sign-In via Apple's AuthenticationServices and Google's iOS
-// SDK). The plugin syncs credentials with Firebase Auth web SDK so the rest
-// of the app continues to use onAuthStateChanged on the auth instance.
+// SDK). On native, plugin runs with skipNativeAuth:true — it returns the OAuth
+// credential WITHOUT signing into Firebase. We then call signInWithCredential
+// on the JS Firebase Auth instance exactly once. This single-path approach
+// avoids the "auth/missing-or-invalid-nonce / Duplicate credential" error,
+// which happens when Apple's single-use identity token is consumed by both
+// the native plugin AND the JS SDK.
 //
 // On web (localhost dev), the plugin falls back to Firebase Auth web SDK
 // (signInWithPopup), which works because localhost is in the authorized
-// domains list. In Capacitor's WKWebView, the plugin uses native flows that
-// bypass the cross-origin iframe entirely.
+// domains list.
 
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { GoogleAuthProvider, OAuthProvider, signInWithCredential, signOut as firebaseSignOut } from "firebase/auth";
