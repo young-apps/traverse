@@ -90,6 +90,39 @@ workflows:
         # (FirebaseAuthentication, GoogleSignIn, etc.).
         script: npx cap sync ios
 
+      - name: Enable Google Sign-In subspec in Podfile
+        # @capacitor-firebase/authentication's podspec defaults to the Lite
+        # subspec, which does NOT include the GoogleSignIn pod and does NOT
+        # define the -DRGCFA_INCLUDE_GOOGLE compile flag. Result: native
+        # signInWithGoogle() hangs forever with no UI.
+        # Apple Sign-In works regardless because it uses Apple's built-in
+        # AuthenticationServices framework (no pod needed).
+        # We patch the Podfile to request the Google subspec and re-run
+        # pod install so GoogleSignIn 7.1.0 is actually pulled in.
+        script: |
+          cd ios/App
+          ruby - <<'RUBY'
+          path = 'Podfile'
+          content = File.read(path)
+          if content.include?(":subspecs => ['Google']")
+            puts "Podfile already requests Google subspec — nothing to do"
+          else
+            new_content = content.gsub(
+              /pod 'CapacitorFirebaseAuthentication',\s*:path\s*=>\s*'([^']+)'/,
+              "pod 'CapacitorFirebaseAuthentication', :path => '\\1', :subspecs => ['Google']"
+            )
+            if new_content == content
+              abort "Could not find CapacitorFirebaseAuthentication pod line in Podfile — Capacitor may have changed its template"
+            end
+            File.write(path, new_content)
+            puts "Patched Podfile to use Google subspec"
+          end
+          RUBY
+          echo "----- Podfile after patch -----"
+          grep CapacitorFirebaseAuthentication Podfile
+          echo "-------------------------------"
+          pod install
+
       - name: Write GoogleService-Info.plist
         # Native Firebase iOS SDK calls [FIRApp configure] on launch and
         # hard-crashes if GoogleService-Info.plist is absent from the app
