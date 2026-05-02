@@ -90,44 +90,70 @@ workflows:
         # (FirebaseAuthentication, GoogleSignIn, etc.).
         script: npx cap sync ios
 
-      - name: Enable Google Sign-In subspec in Podfile
-        # @capacitor-firebase/authentication's podspec defaults to the Lite
-        # subspec, which does NOT include the GoogleSignIn pod and does NOT
-        # define the -DRGCFA_INCLUDE_GOOGLE compile flag. Result: native
-        # signInWithGoogle() hangs forever with no UI.
-        # Apple Sign-In works regardless because it uses Apple's built-in
-        # AuthenticationServices framework (no pod needed).
-        # We patch the Podfile to request the Google subspec and do a CLEAN
-        # pod install (delete Pods/ + Podfile.lock first) — switching
-        # subspecs on an existing install can leave the plugin half-linked,
-        # which manifests as "UNIMPLEMENTED: FirebaseAuthentication plugin
-        # is not implemented on ios" at runtime.
+      - name: Enable Google Sign-In via post_install hook
+        # @capacitor-firebase/authentication ships three subspecs:
+        #   - Lite (default)  : just FirebaseAuth — Apple Sign-In works because
+        #                        it uses Apple's built-in AuthenticationServices
+        #                        (no pod needed).
+        #   - Google          : adds GoogleSignIn 7.1.0 + -DRGCFA_INCLUDE_GOOGLE
+        #                        Swift flag that activates Google code paths
+        #                        gated by `#if RGCFA_INCLUDE_GOOGLE` in the
+        #                        plugin's source.
+        # Switching the plugin to the Google subspec broke Capacitor's plugin
+        # registration (UNIMPLEMENTED at runtime). So instead, we keep the
+        # plugin on Lite (known-working Capacitor integration) and manually:
+        #   1. Add GoogleSignIn 7.1.0 pod to the App target
+        #   2. Inject -DRGCFA_INCLUDE_GOOGLE via a post_install hook so the
+        #      plugin's Google handler compiles in.
+        # This is fully equivalent to the Google subspec but avoids the
+        # framework-naming change that breaks @objc registration.
         script: |
           cd ios/App
           ruby - <<'RUBY'
           path = 'Podfile'
           content = File.read(path)
-          if content.include?(":subspecs => ['Google']")
-            puts "Podfile already requests Google subspec — nothing to do"
-          else
-            new_content = content.gsub(
-              /pod 'CapacitorFirebaseAuthentication',\s*:path\s*=>\s*'([^']+)'/,
-              "pod 'CapacitorFirebaseAuthentication', :path => '\\1', :subspecs => ['Google']"
+
+          # 1. Add `pod 'GoogleSignIn', '7.1.0'` inside the App target if not already there
+          unless content.include?("pod 'GoogleSignIn'")
+            content = content.sub(
+              /(target 'App' do\s*\n\s*capacitor_pods)/,
+              "\\1\n  pod 'GoogleSignIn', '7.1.0'"
             )
-            if new_content == content
-              abort "Could not find CapacitorFirebaseAuthentication pod line in Podfile — Capacitor may have changed its template"
-            end
-            File.write(path, new_content)
-            puts "Patched Podfile to use Google subspec"
+            puts "Added GoogleSignIn pod to App target"
           end
+
+          # 2. Add a post_install hook that injects -DRGCFA_INCLUDE_GOOGLE into
+          #    the CapacitorFirebaseAuthentication pod's Swift compile flags.
+          unless content.include?("RGCFA_INCLUDE_GOOGLE")
+            hook = <<~POSTINSTALL
+
+              post_install do |installer|
+                installer.pods_project.targets.each do |t|
+                  if t.name == 'CapacitorFirebaseAuthentication'
+                    t.build_configurations.each do |config|
+                      existing = config.build_settings['OTHER_SWIFT_FLAGS'] || '$(inherited)'
+                      unless existing.include?('-DRGCFA_INCLUDE_GOOGLE')
+                        config.build_settings['OTHER_SWIFT_FLAGS'] = "#{existing} -DRGCFA_INCLUDE_GOOGLE"
+                      end
+                    end
+                  end
+                end
+              end
+            POSTINSTALL
+
+            # Replace any existing post_install (Capacitor may have one) by
+            # appending ours — both will run if structured as separate blocks.
+            content += hook
+            puts "Added post_install hook for -DRGCFA_INCLUDE_GOOGLE"
+          end
+
+          File.write(path, content)
           RUBY
           echo "----- Podfile after patch -----"
-          grep CapacitorFirebaseAuthentication Podfile
+          cat Podfile
           echo "-------------------------------"
-          # Clean reinstall so the subspec change actually takes effect
-          rm -rf Pods Podfile.lock
-          pod install --repo-update
-          echo "----- Verifying plugin is now built with Google subspec -----"
+          pod install
+          echo "----- Pods installed -----"
           grep -E "CapacitorFirebaseAuthentication|GoogleSignIn" Podfile.lock | sort -u
 
       - name: Write GoogleService-Info.plist
