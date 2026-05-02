@@ -59,7 +59,7 @@ workflows:
               end
             BLOCK
             patched = content.sub(
-              /s\.subspec 'Lite' do \|lite\|.*?end/m,
+              /s\.subspec 'Lite' do \|lite\|.*?\n\s*end\b/m,
               new_lite.strip
             )
             if patched == content
