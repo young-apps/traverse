@@ -127,39 +127,13 @@ workflows:
             puts "Added GoogleSignIn pod (~> 8.0)"
           end
 
-          # 2. Inject our flag-setting logic INTO the existing post_install block
-          # NOTE: <<~'LOGIC' (single-quoted delimiter) DISABLES Ruby string
-          # interpolation. We need this so #{flags} stays as literal text in
-          # the generated Podfile post_install block, NOT evaluated here.
-          flag_logic = <<~'LOGIC'
-            installer.pods_project.targets.each do |t|
-              if t.name == 'CapacitorFirebaseAuthentication'
-                t.build_configurations.each do |c|
-                  flags = c.build_settings['OTHER_SWIFT_FLAGS'] || '$(inherited)'
-                  unless flags.include?('-DRGCFA_INCLUDE_GOOGLE')
-                    c.build_settings['OTHER_SWIFT_FLAGS'] = "#{flags} -DRGCFA_INCLUDE_GOOGLE"
-                  end
-                end
-                puts "[post_install] applied -DRGCFA_INCLUDE_GOOGLE"
-              end
-            end
-          LOGIC
-
-          unless content.include?('RGCFA_INCLUDE_GOOGLE')
-            if content =~ /post_install do \|installer\|/
-              # Inject right after the opening line of the existing block
-              content.sub!(
-                /(post_install do \|installer\|\s*\n)/,
-                "\\1#{flag_logic.lines.map { |l| "  #{l}" }.join}"
-              )
-              puts "Merged flag logic into existing post_install"
-            else
-              content += "\npost_install do |installer|\n#{flag_logic}end\n"
-              puts "Created new post_install block"
-            end
-          end
-
           File.write(path, content)
+          # NOTE: We deliberately do NOT modify the post_install block here.
+          # Modifying target.build_settings inside a Ruby post_install hook
+          # writes to project.pbxproj, which CocoaPods regenerates during
+          # subsequent operations and which is overridden by xcconfig anyway.
+          # We patch the generated xcconfig files directly in the bash step
+          # below — that's the precedence-correct place for the flag.
           RUBY
           echo "----- Podfile after patch -----"
           cat Podfile
@@ -171,18 +145,36 @@ workflows:
           rm -f Podfile.lock
           rm -rf Pods
           pod install
+
           echo ""
-          echo "===== VERIFY: -DRGCFA_INCLUDE_GOOGLE in plugin xcconfig ====="
+          echo "===== Inject -DRGCFA_INCLUDE_GOOGLE into plugin xcconfig ====="
+          # CocoaPods generates xcconfig files in
+          # Pods/Target Support Files/CapacitorFirebaseAuthentication/.
+          # These are the BASE configurations Xcode uses for the pod target,
+          # and they take precedence over project.pbxproj for inherited flags.
+          # We append -DRGCFA_INCLUDE_GOOGLE to OTHER_SWIFT_FLAGS in each one
+          # so the plugin's #if RGCFA_INCLUDE_GOOGLE Google handler compiles
+          # in. The plugin pod stays on its default Lite subspec — we're just
+          # toggling the compile-time flag that subspec would have set.
           XCCONFIG_DIR="Pods/Target Support Files/CapacitorFirebaseAuthentication"
-          if grep -r "RGCFA_INCLUDE_GOOGLE" "$XCCONFIG_DIR" 2>/dev/null; then
-            echo "✅ Flag is present in the generated xcconfig"
+          for f in "$XCCONFIG_DIR"/*.xcconfig; do
+            if grep -q "RGCFA_INCLUDE_GOOGLE" "$f"; then
+              echo "Already patched: $f"
+            else
+              # macOS sed in-place needs an empty extension argument
+              sed -i '' 's|^OTHER_SWIFT_FLAGS = \(.*\)$|OTHER_SWIFT_FLAGS = \1 -DRGCFA_INCLUDE_GOOGLE|' "$f"
+              echo "Patched: $f"
+            fi
+          done
+
+          echo ""
+          echo "===== VERIFY ====="
+          if grep -h "RGCFA_INCLUDE_GOOGLE" "$XCCONFIG_DIR"/*.xcconfig; then
+            echo "✅ Flag present in plugin xcconfig"
           else
-            echo "❌ Flag MISSING — Google Sign-In will not work"
-            echo "Contents of $XCCONFIG_DIR:"
-            ls -la "$XCCONFIG_DIR" 2>/dev/null || echo "(directory not found)"
-            echo ""
-            echo "OTHER_SWIFT_FLAGS in xcconfig files:"
-            grep -h "OTHER_SWIFT_FLAGS" "$XCCONFIG_DIR"/*.xcconfig 2>/dev/null
+            echo "❌ Flag still MISSING after sed patch"
+            echo "Current OTHER_SWIFT_FLAGS lines:"
+            grep -h "OTHER_SWIFT_FLAGS" "$XCCONFIG_DIR"/*.xcconfig
             exit 1
           fi
 
