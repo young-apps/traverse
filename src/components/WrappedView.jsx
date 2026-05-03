@@ -29,7 +29,9 @@ function calcYearData(stays) {
   const rated = stays.filter((s) => s.rating);
   const avgRating = rated.length ? rated.reduce((s, r) => s + r.rating, 0) / rated.length : 0;
   const topRated = stays.filter((s) => s.rating === 5).slice(0, 3);
-  const brands = {}; hotelStays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + 1; });
+  // Loyalty by *nights*, not booking count -- a few long stays at one
+  // chain count for more than scattered one-nighters elsewhere.
+  const brands = {}; hotelStays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + (s.nights || 1); });
   const topBrand = Object.entries(brands).sort(([, a], [, b]) => b - a)[0];
   const cityNights = {}; stays.forEach((s) => { const c = s.metroArea || s.city; if (c) cityNights[c] = (cityNights[c] || 0) + (s.nights || 0); });
   const topCity = Object.entries(cityNights).sort(([, a], [, b]) => b - a)[0];

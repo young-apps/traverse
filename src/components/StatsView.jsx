@@ -86,7 +86,22 @@ export default function StatsView({ stays }) {
   // pre-date the reverse-geocode flow.
   const byCity = {}; past.forEach((s) => { const c = s.metroArea || s.city; if (c) byCity[c] = (byCity[c] || 0) + (s.nights || 0); });
   // Brand detection is meaningless for "stayed at a friend's place" entries.
-  const byBrand = {}; past.forEach((s) => { if (s.stayType === "home") return; const b = detectBrand(s.hotel); byBrand[b] = (byBrand[b] || 0) + 1; });
+  // Weighted by *nights*, not booking count: a 14-night Ritz week says
+  // more about loyalty than 14 one-night Holiday Inn stops.
+  const byBrand = {};
+  past.forEach((s) => {
+    if (s.stayType === "home") return;
+    const b = detectBrand(s.hotel);
+    byBrand[b] = (byBrand[b] || 0) + (s.nights || 1);
+  });
+  const brandSorted = Object.entries(byBrand).sort(([, a], [, b]) => b - a);
+  // "Unique Brands Explored" — a primary travel-variety stat. Excludes
+  // the catch-all "Independent" bucket so a user with 12 boutique hotels
+  // doesn't see "1 brand" when they really mean 12 distinct properties.
+  const namedBrands = brandSorted.filter(([name]) => name !== "Independent");
+  const independentCount = past.filter((s) => s.stayType !== "home" && detectBrand(s.hotel) === "Independent").length;
+  const uniqueBrandCount = namedBrands.length;
+  const topBrandLabel = namedBrands[0]?.[0] || (independentCount ? "Independent" : "—");
   const bySource = {}; stays.forEach((s) => { if (s.bookedVia) bySource[s.bookedVia] = (bySource[s.bookedVia] || 0) + 1; });
   const byRoom = {}; stays.forEach((s) => { if (s.roomType) byRoom[s.roomType] = (byRoom[s.roomType] || 0) + 1; });
   const byTrip = {}; stays.forEach((s) => { if (s.tripPurpose) byTrip[s.tripPurpose] = (byTrip[s.tripPurpose] || 0) + 1; });
@@ -101,10 +116,12 @@ export default function StatsView({ stays }) {
       {/* Summary */}
       <div className="stats-grid">
         {[
-          { v: totalNights, l: "Nights", s: `${past.length} stays` },
-          { v: avg.toFixed(1), l: "Avg Rating", s: `${rated.length} rated` },
-          { v: cities.length, l: "Cities", s: citySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" },
           { v: countries.length, l: "Countries", s: countrySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" },
+          { v: totalNights, l: "Nights", s: `${past.length} stays` },
+          { v: cities.length, l: "Cities", s: citySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" },
+          // Brand variety is a primary stat — celebrates trying new
+          // properties, not just booking the same chain on points.
+          { v: uniqueBrandCount, l: "Brands", s: topBrandLabel === "—" ? "—" : `top: ${topBrandLabel}` },
         ].map((stat, i) => (
           <div key={i} className="stat-card" style={{ animationDelay: `${i * 0.08}s` }}>
             <div className="stat-value">{stat.v}</div>
@@ -143,8 +160,11 @@ export default function StatsView({ stays }) {
       {/* Expandable Countries */}
       {countrySorted.length > 0 && <ExpandableList title="Countries" emoji="🌍" items={countrySorted} unit="nights" />}
 
-      {/* Brand Affinity */}
-      {Object.keys(byBrand).length > 0 && <div className="chart-section"><div className="chart-title">🏨 Favorite Brands</div><BarChart data={byBrand} color="var(--accent)" labelWidth={110} /></div>}
+      {/* Brand affinity — every unique brand is shown so single-stay
+          boutique properties get visibility too, not just the top-N
+          chains. Ranked by total nights stayed (loyalty by depth, not
+          booking volume). */}
+      {brandSorted.length > 0 && <ExpandableList title="Brands" emoji="🏨" items={brandSorted} unit="nights" />}
 
       {/* Nights by Year */}
       {Object.keys(byYear).length > 0 && (
