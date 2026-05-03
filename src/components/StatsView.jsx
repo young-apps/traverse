@@ -66,8 +66,12 @@ export default function StatsView({ stays }) {
   const countries = [...new Set(past.map((s) => s.country).filter(Boolean))];
   const cities = [...new Set(past.map((s) => s.city).filter(Boolean))];
   const totalNights = past.reduce((sum, s) => sum + (s.nights || 0), 0);
-  const totalSpend = past.reduce((sum, s) => sum + (s.totalCost || 0), 0);
-  const stayedWithCost = past.filter((s) => (s.totalCost || 0) > 0);
+  // Sum in USD. New entries store totalCostUSD (converted at booking
+  // time); legacy entries pre-currency-feature stored only totalCost
+  // and were always USD, so falling back to that is correct.
+  const usdOf = (s) => (s.totalCostUSD ?? s.totalCost) || 0;
+  const totalSpend = past.reduce((sum, s) => sum + usdOf(s), 0);
+  const stayedWithCost = past.filter((s) => usdOf(s) > 0);
   const avgPerNight = stayedWithCost.length
     ? totalSpend / stayedWithCost.reduce((sum, s) => sum + (s.nights || 0), 0)
     : 0;

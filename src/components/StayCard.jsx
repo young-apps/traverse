@@ -1,4 +1,5 @@
 // StayCard — tappable location, edit button, no emojis for status
+import { formatMoney } from "../services/fx";
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 const fmtYear = (d) => d ? new Date(d + "T00:00:00").getFullYear() : "";
 
@@ -64,7 +65,7 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
               {stay.clubAccess && stay.clubAccess !== "None" && <span className="chip chip-purple">{stay.clubAccess}</span>}
               {stay.upgradeStatus && stay.upgradeStatus !== "None" && <span className="chip chip-green">{stay.upgradeStatus}</span>}
               {stay.bookedVia && <span className="chip chip-blue">{stay.bookedVia}</span>}
-              {stay.totalCost > 0 && <span className="chip chip-green">${stay.totalCost.toLocaleString()}</span>}
+              {stay.totalCost > 0 && <span className="chip chip-green">{formatMoney(stay.totalCost, stay.currency || "USD")}</span>}
               {stay.loyaltyNumber && <span className="chip chip-purple">{stay.loyaltyNumber}</span>}
             </div>
           )}

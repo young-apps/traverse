@@ -1,8 +1,9 @@
 // AddStayModal — expanded data model, cost visible by default
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { searchHotels } from "../services/places";
+import { convertToUSD, formatMoney } from "../services/fx";
 import DateRangePicker from "./DateRangePicker";
-import { ROOM_TYPES, BED_TYPES, VIEW_TYPES, CLUB_ACCESS, UPGRADE_STATUS, BOOKING_SOURCES, TRIP_PURPOSES } from "../constants";
+import { ROOM_TYPES, BED_TYPES, VIEW_TYPES, CLUB_ACCESS, UPGRADE_STATUS, BOOKING_SOURCES, TRIP_PURPOSES, CURRENCIES } from "../constants";
 
 function ChipPicker({ options, value, onChange, label }) {
   return (<>
@@ -34,6 +35,8 @@ export default function AddStayModal({ onClose, onAdd }) {
   const [costPerNight, setCPN] = useState(""); const [totalCostM, setTCM] = useState("");
   const [costMode, setCM] = useState("nightly"); const [showMore, setSM] = useState(false);
   const [tripPurpose, setTP] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [submitting, setSubmitting] = useState(false);
   const debRef = useRef(null);
 
   const doSearch = useCallback(async (q) => {
@@ -61,8 +64,16 @@ export default function AddStayModal({ onClose, onAdd }) {
   const total = costMode === "nightly" && costPerNight && nights > 0 ? Math.round(parseFloat(costPerNight) * nights) : costMode === "total" && totalCostM ? parseInt(totalCostM) : null;
   const canAdd = selected && checkIn && checkOut && nights > 0;
 
-  const handleSubmit = () => {
-    if (!canAdd) return;
+  const handleSubmit = async () => {
+    if (!canAdd || submitting) return;
+    setSubmitting(true);
+    // Convert cost once at booking-time. Stored as USD on the doc so
+    // every later read (stats, leaderboard, wrapped) is zero-cost.
+    let totalCostUSD = null, fxRate = null, fxDate = null;
+    if (total > 0) {
+      const conv = await convertToUSD(total, currency, checkIn);
+      if (conv) { totalCostUSD = conv.usd; fxRate = conv.rate; fxDate = conv.rateDate; }
+    }
     onAdd({
       hotel: selected.name, city: selected.city, country: selected.country,
       lat: selected.lat, lng: selected.lng, address: selected.address, placeId: selected.placeId || null,
@@ -72,7 +83,10 @@ export default function AddStayModal({ onClose, onAdd }) {
       clubAccess: clubAccess || null, upgradeStatus: upgradeStatus || null,
       bookedVia: bookedVia || null, loyaltyNumber: loyaltyNumber || null,
       costPerNight: costMode === "nightly" && costPerNight ? parseFloat(costPerNight) : null,
-      totalCost: total, tripPurpose: tripPurpose || null, notes,
+      totalCost: total,
+      currency: total > 0 ? currency : null,
+      totalCostUSD, fxRate, fxDate,
+      tripPurpose: tripPurpose || null, notes,
     });
   };
 
@@ -126,11 +140,27 @@ export default function AddStayModal({ onClose, onAdd }) {
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {["nightly", "total"].map((m) => <button key={m} onClick={() => setCM(m)} style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${costMode === m ? "var(--accent-border)" : "var(--border)"}`, background: costMode === m ? "var(--accent-muted)" : "transparent", color: costMode === m ? "var(--accent)" : "var(--text-dim)", font: "500 11px var(--font-sans)", cursor: "pointer" }}>{m === "nightly" ? "Per Night" : "Total"}</button>)}
           </div>
-          <div style={{ position: "relative", marginBottom: 14 }}>
-            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }}>$</span>
-            {costMode === "nightly" ? <input className="field-input" type="number" min="0" placeholder="e.g. 350" value={costPerNight} onChange={(e) => setCPN(e.target.value)} style={{ paddingLeft: 28 }} /> : <input className="field-input" type="number" min="0" placeholder="e.g. 1050" value={totalCostM} onChange={(e) => setTCM(e.target.value)} style={{ paddingLeft: 28 }} />}
+          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)", font: "12px var(--font-mono)" }}>{currency}</span>
+              {costMode === "nightly" ? <input className="field-input" type="number" min="0" placeholder="e.g. 350" value={costPerNight} onChange={(e) => setCPN(e.target.value)} style={{ paddingLeft: 48 }} /> : <input className="field-input" type="number" min="0" placeholder="e.g. 1050" value={totalCostM} onChange={(e) => setTCM(e.target.value)} style={{ paddingLeft: 48 }} />}
+            </div>
+            <select
+              className="field-input"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              style={{ width: 92, appearance: "auto" }}
+              aria-label="Currency"
+            >
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
-          {total > 0 && costMode === "nightly" && <div style={{ font: "12px var(--font-mono)", color: "var(--accent)", marginBottom: 14, marginTop: -8 }}>Total: ${total.toLocaleString()}</div>}
+          {total > 0 && (
+            <div style={{ font: "12px var(--font-mono)", color: "var(--accent)", marginBottom: 14, marginTop: -8 }}>
+              {costMode === "nightly" && <>Total: {formatMoney(total, currency)}</>}
+              {currency !== "USD" && <span style={{ color: "var(--text-dim)", marginLeft: 8 }}>· converts to USD on save</span>}
+            </div>
+          )}
 
           {/* More details */}
           <button onClick={() => setSM(!showMore)} style={{ width: "100%", padding: "10px 14px", marginBottom: 14, background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text-secondary)", font: "500 13px var(--font-sans)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -156,7 +186,7 @@ export default function AddStayModal({ onClose, onAdd }) {
 
           <label className="field-label">Notes</label>
           <textarea className="field-input" placeholder="Room tips, highlights…" rows={2} value={notes} onChange={(e) => setN(e.target.value)} style={{ resize: "vertical", marginBottom: 20 }} />
-          <button className="btn-submit" onClick={handleSubmit} disabled={!canAdd}>{canAdd ? `Log ${nights}-Night Stay` : "Search a hotel & set dates"}</button>
+          <button className="btn-submit" onClick={handleSubmit} disabled={!canAdd || submitting}>{submitting ? "Saving…" : canAdd ? `Log ${nights}-Night Stay` : "Search a hotel & set dates"}</button>
         </div>
       </div>
     </div>

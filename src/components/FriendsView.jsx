@@ -1,12 +1,14 @@
 // FriendsView — with privacy disclaimer + opt-in stay-sharing toggle
-import { useState, useEffect } from "react";
-import { findUserByEmail, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
+import { useState, useEffect, useRef } from "react";
+import { findUserByEmail, findUsersByName, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
+import { TERMS_URL } from "../services/links";
 
 const fmt = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const fmtS = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
 
 export default function FriendsView({ user, friends, requests, friendStays, onRefresh }) {
-  const [email, setEmail] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]); // name-search candidates
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -14,6 +16,7 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
   // Sharing is OFF by default — users explicitly opt in to expose their stays.
   const [sharing, setSharing] = useState(false);
   const [savingShare, setSavingShare] = useState(false);
+  const searchDebounce = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -33,23 +36,72 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
     setSavingShare(false);
   };
 
-  const handleSendRequest = async () => {
-    if (!email.trim()) return;
-    setSearching(true); setError(null); setSuccess(null);
+  // Debounced search — email lookup if it looks like an email, otherwise
+  // name-prefix lookup. Shows up to 8 candidates the user can pick from.
+  useEffect(() => {
+    clearTimeout(searchDebounce.current);
+    setError(null); setSuccess(null);
+    const q = searchQuery.trim();
+    if (q.length < 2) { setSearchResults([]); return; }
+    searchDebounce.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        if (q.includes("@")) {
+          const found = await findUserByEmail(q);
+          setSearchResults(found ? [found] : []);
+          if (!found) setError("No Traverse account with that email.");
+        } else {
+          const list = await findUsersByName(q);
+          // Filter out self + existing friends from the visible list.
+          const filtered = list.filter((p) => p.uid !== user.uid && !friends.some((f) => f.friendUid === p.uid));
+          setSearchResults(filtered);
+          if (!filtered.length) setError("No matches.");
+        }
+      } catch (e) {
+        console.error("search error", e);
+        if (e.code === "permission-denied") setError("Permission denied. Firestore rules need updating.");
+        else setError(`Search failed: ${e.message || "unknown"}`);
+        setSearchResults([]);
+      }
+      setSearching(false);
+    }, 350);
+    return () => clearTimeout(searchDebounce.current);
+  }, [searchQuery, user.uid, friends]);
+
+  const handleSendRequestTo = async (profile) => {
+    setError(null); setSuccess(null);
     try {
-      if (email.toLowerCase().trim() === user.email?.toLowerCase()) { setError("That's your own email!"); setSearching(false); return; }
-      const found = await findUserByEmail(email);
-      if (!found) { setError("No Traverse account found with that email."); setSearching(false); return; }
-      if (friends.some((f) => f.friendUid === found.uid)) { setError("Already in your friends list."); setSearching(false); return; }
-      await sendFriendRequest(user, found.uid);
-      setSuccess(`Request sent to ${found.displayName || found.email}!`);
-      setEmail("");
+      if (profile.uid === user.uid) { setError("That's you!"); return; }
+      if (friends.some((f) => f.friendUid === profile.uid)) { setError("Already in your friends list."); return; }
+      await sendFriendRequest(user, profile.uid);
+      setSuccess(`Request sent to ${profile.displayName || profile.email}!`);
+      setSearchQuery(""); setSearchResults([]);
     } catch (e) {
       console.error("Send request error:", e);
       if (e.code === "permission-denied") setError("Permission denied. Update your Firestore rules (see README).");
       else setError(`Failed: ${e.message || "Unknown error"}`);
     }
-    setSearching(false);
+  };
+
+  // Share sheet (iOS / Android / supported browsers) → falls back to
+  // clipboard. Until the App Store listing is live, link points at the
+  // GitHub Pages site which can host a "Get Traverse" landing page.
+  const handleInvite = async () => {
+    const myName = user.displayName?.split(" ")[0] || "your friend";
+    const text = `${myName} invited you to Traverse — track your hotel stays. ${TERMS_URL}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Traverse", text, url: TERMS_URL });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setSuccess("Invite link copied!");
+      } else {
+        window.prompt("Copy and share this link:", text);
+      }
+    } catch (e) {
+      // User cancelled the share sheet — that's fine, swallow.
+      if (e?.name !== "AbortError") console.warn("share failed", e);
+    }
   };
 
   const handleAccept = async (req) => {
@@ -124,19 +176,41 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
         </div>
       )}
 
-      {/* Send request */}
+      {/* Add / invite friends */}
       <div style={{ padding: 16, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)", marginBottom: 16 }}>
-        <div style={{ font: "600 10px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 8 }}>Add a Friend</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input style={{ flex: 1, padding: "10px 14px", background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text)", font: "13px var(--font-sans)", outline: "none" }}
-            placeholder="Enter their email address…" value={email}
-            onChange={(e) => { setEmail(e.target.value); setError(null); setSuccess(null); }}
-            onKeyDown={(e) => e.key === "Enter" && handleSendRequest()} />
-          <button onClick={handleSendRequest} disabled={searching || !email.trim()} style={{
-            padding: "10px 16px", borderRadius: 10, background: email.trim() ? "var(--accent)" : "var(--surface-hover)",
-            border: "none", color: email.trim() ? "var(--bg)" : "var(--text-dim)", font: "700 13px var(--font-sans)", cursor: email.trim() ? "pointer" : "not-allowed",
-          }}>{searching ? "…" : "Send"}</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ font: "600 10px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1.2 }}>Add a Friend</div>
+          <button onClick={handleInvite} style={{
+            padding: "5px 10px", borderRadius: 8, background: "transparent", border: "1px solid var(--accent-border)",
+            color: "var(--accent)", font: "600 11px var(--font-sans)", cursor: "pointer",
+          }}>Invite via link</button>
         </div>
+        <input style={{ width: "100%", padding: "10px 14px", background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text)", font: "13px var(--font-sans)", outline: "none", boxSizing: "border-box" }}
+          placeholder="Search by name or email…" value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)} />
+
+        {/* Candidate list — appears as you type */}
+        {(searching || searchResults.length > 0) && (
+          <div style={{ marginTop: 8, borderRadius: 10, overflow: "hidden", background: "var(--bg-2)", border: "1px solid var(--border)" }}>
+            {searching && <div style={{ padding: "10px 12px", font: "12px var(--font-mono)", color: "var(--text-dim)" }}>Searching…</div>}
+            {!searching && searchResults.map((p) => (
+              <div key={p.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--border)" }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                  {p.photoURL ? <img src={p.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ font: "600 11px var(--font-mono)", color: "var(--text-dim)" }}>{(p.displayName || p.email || "?").charAt(0).toUpperCase()}</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ font: "500 13px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName || p.email}</div>
+                  <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.email}</div>
+                </div>
+                <button onClick={() => handleSendRequestTo(p)} style={{
+                  padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--accent)",
+                  color: "var(--bg)", font: "700 11px var(--font-sans)", cursor: "pointer", flexShrink: 0,
+                }}>Add</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {error && <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(240,96,80,0.08)", border: "1px solid rgba(240,96,80,0.15)", color: "var(--red)", font: "12px var(--font-sans)", lineHeight: 1.4 }}>{error}</div>}
         {success && <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "var(--green-muted)", border: "1px solid rgba(61,214,140,0.2)", color: "var(--green)", font: "12px var(--font-mono)" }}>{success}</div>}
       </div>

@@ -27,3 +27,13 @@ export const BOOKING_SOURCES = [
 ];
 
 export const TRIP_PURPOSES = ["Personal", "Work", "Bleisure", "Family", "Event", "Wedding"];
+
+// Currencies supported by Frankfurter (https://www.frankfurter.app/docs/).
+// Listed roughly by traveller frequency. Anything outside this list would
+// fail the FX call; for ~edge cases (AED, TWD) the user can enter USD.
+export const CURRENCIES = [
+  "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY",
+  "MXN", "BRL", "INR", "SGD", "HKD", "ZAR", "NZD", "KRW",
+  "THB", "SEK", "NOK", "DKK", "PLN", "TRY", "PHP", "MYR",
+  "IDR", "HUF", "CZK", "ILS", "RON", "BGN", "ISK",
+];

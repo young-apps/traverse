@@ -15,9 +15,20 @@ import { db } from "./firebase";
 // NOTE: shareStaysWithFriends defaults to FALSE — users must explicitly opt
 // in before any of their stays are exposed to friends via getFriendStays().
 export function saveUserProfile(user) {
+  // displayNameLower mirrors displayName for case-insensitive prefix
+  // search (Firestore can't lower-case in queries). Updated on every
+  // login so renames flow through.
+  const displayName = user.displayName || "";
   return setDoc(
     doc(db, "users", user.uid, "profile", "main"),
-    { uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "", updatedAt: serverTimestamp() },
+    {
+      uid: user.uid,
+      displayName,
+      displayNameLower: displayName.toLowerCase(),
+      email: user.email || "",
+      photoURL: user.photoURL || "",
+      updatedAt: serverTimestamp(),
+    },
     { merge: true }
   );
 }
@@ -42,6 +53,22 @@ export async function findUserByEmail(email) {
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
   return snapshot.docs[0].data();
+}
+
+/**
+ * Case-insensitive prefix search by display name. Returns up to 8
+ * profiles. Requires Firestore rule allowing collectionGroup reads
+ * on `profile` where the query filter is on displayNameLower (the
+ * same rule shape that already works for findUserByEmail).
+ */
+export async function findUsersByName(nameQuery) {
+  const q = nameQuery.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const ref = collectionGroup(db, "profile");
+  const snap = await getDocs(
+    query(ref, where("displayNameLower", ">=", q), where("displayNameLower", "<=", q + "\uf8ff"))
+  );
+  return snap.docs.map((d) => d.data()).slice(0, 8);
 }
 
 // ── Friend Requests ──
