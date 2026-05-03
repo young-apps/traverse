@@ -1,12 +1,13 @@
-// LeaderboardView — Hotels, Nights, Total Spend
+// LeaderboardView — Hotels, Nights, Nights per Year
+// (Total spend is intentionally excluded from social comparisons; lives
+// in the user's own Insights tab only.)
 function calcStats(stays) {
   const past = stays.filter((s) => s.status === "past");
   const totalHotels = past.length;
   const totalNights = past.reduce((sum, s) => sum + (s.nights || 0), 0);
-  const totalSpend = past.reduce((sum, s) => sum + (s.totalCost || 0), 0);
   const years = new Set(past.map((s) => s.checkIn ? new Date(s.checkIn + "T00:00:00").getFullYear() : null).filter(Boolean));
   const nightsPerYear = years.size > 0 ? totalNights / years.size : 0;
-  return { totalHotels, totalNights, totalSpend, nightsPerYear, yearsActive: years.size };
+  return { totalHotels, totalNights, nightsPerYear, yearsActive: years.size };
 }
 
 function RankBadge({ rank }) {
@@ -52,7 +53,6 @@ export default function LeaderboardView({ user, stays, friends, friendStays }) {
   const boards = [
     { title: "Hotels Visited", emoji: "🏨", entries: [...all].sort((a, b) => b.stats.totalHotels - a.stats.totalHotels).map((e) => ({ ...e, value: e.stats.totalHotels })) },
     { title: "Total Nights", emoji: "🌙", entries: [...all].sort((a, b) => b.stats.totalNights - a.stats.totalNights).map((e) => ({ ...e, value: e.stats.totalNights })) },
-    { title: "Total Spend", emoji: "💰", entries: [...all].sort((a, b) => b.stats.totalSpend - a.stats.totalSpend).map((e) => ({ ...e, value: e.stats.totalSpend > 0 ? `$${e.stats.totalSpend.toLocaleString()}` : "—" })) },
     { title: "Nights per Year", emoji: "📅", entries: [...all].sort((a, b) => b.stats.nightsPerYear - a.stats.nightsPerYear).map((e) => ({ ...e, value: e.stats.nightsPerYear.toFixed(1) })) },
   ];
 

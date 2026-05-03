@@ -25,10 +25,10 @@ function calcYearData(stays) {
   const topRated = stays.filter((s) => s.rating === 5).slice(0, 3);
   const brands = {}; stays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + 1; });
   const topBrand = Object.entries(brands).sort(([, a], [, b]) => b - a)[0];
-  const totalSpend = stays.reduce((sum, s) => sum + (s.totalCost || 0), 0);
   const cityNights = {}; stays.forEach((s) => { if (s.city) cityNights[s.city] = (cityNights[s.city] || 0) + (s.nights || 0); });
   const topCity = Object.entries(cityNights).sort(([, a], [, b]) => b - a)[0];
-  return { totalHotels, totalNights, cities, countries, avgRating, topRated, topBrand, totalSpend, topCity };
+  // Total spend is intentionally NOT included — kept private in Insights only.
+  return { totalHotels, totalNights, cities, countries, avgRating, topRated, topBrand, topCity };
 }
 
 export default function WrappedView({ user, stays }) {
@@ -144,7 +144,6 @@ export default function WrappedView({ user, stays }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
             {data.countries.length > 0 && <div style={mc}><div style={ml}>🌍 Countries</div><div style={{ font: `600 16px ${SANS}`, color: INK }}>{data.countries.length}</div><div style={{ font: `10px ${MONO}`, color: INK_FAINT, marginTop: 2 }}>{data.countries.slice(0, 4).join(", ")}</div></div>}
             {data.topCity && <div style={mc}><div style={ml}>📍 Top City</div><div style={{ font: `600 16px ${SANS}`, color: INK }}>{data.topCity[0]}</div><div style={{ font: `10px ${MONO}`, color: INK_FAINT, marginTop: 2 }}>{data.topCity[1]} nights</div></div>}
-            {data.totalSpend > 0 && <div style={mc}><div style={ml}>💰 Total Spend</div><div style={{ font: `600 16px ${SANS}`, color: ACCENT }}>${data.totalSpend.toLocaleString()}</div></div>}
             {data.avgRating > 0 && <div style={mc}><div style={ml}>★ Avg Rating</div><div style={{ font: `600 16px ${SANS}`, color: "#F59E0B" }}>{data.avgRating.toFixed(1)}</div></div>}
             {data.topBrand && <div style={mc}><div style={ml}>🏨 Top Brand</div><div style={{ font: `600 14px ${SANS}`, color: INK }}>{data.topBrand[0]}</div><div style={{ font: `10px ${MONO}`, color: INK_FAINT, marginTop: 2 }}>{data.topBrand[1]} stays</div></div>}
           </div>

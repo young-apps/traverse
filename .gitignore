@@ -10,3 +10,5 @@ dist/
 ios/App/Pods/
 ios/.xcode.env.local
 
+.vercel
+.env*.local

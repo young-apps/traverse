@@ -53,27 +53,38 @@ export default function MapView({ stays, selectedId, onSelect }) {
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
 
+      // Pipe Mapbox-internal errors into the diag panel. Without this, a
+      // failed tile/style/glyph fetch is silent and the map renders blank
+      // forever — exactly the symptom seen on the App Store build.
+      map.on("error", (e) => {
+        const m = e?.error?.message || e?.error?.statusText || String(e?.error || e);
+        const url = e?.error?.url || e?.error?.target?.responseURL || "";
+        console.error("[mapbox] error", m, url);
+      });
+      map.on("styleimagemissing", (e) => console.warn("[mapbox] missing image", e?.id));
+
       map.on("load", () => {
+        console.log("[mapbox] style loaded — adding stay layers");
         map.addSource(SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
         // Glow for selected
         map.addLayer({ id: "glow", type: "circle", source: SOURCE, filter: ["==", ["get", "isSelected"], true],
-          paint: { "circle-radius": 24, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#D4A44C"], "circle-opacity": 0.12, "circle-blur": 1 } });
+          paint: { "circle-radius": 24, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#4F46E5"], "circle-opacity": 0.18, "circle-blur": 1 } });
 
-        // Past dots — grey, larger for tappability
+        // Past dots — slate, larger for tappability. Dark stroke so they show on light map.
         map.addLayer({ id: "past", type: "circle", source: SOURCE,
           filter: ["all", ["==", ["get", "status"], "past"], ["==", ["get", "isSelected"], false]],
-          paint: { "circle-radius": 8, "circle-color": "#6B7280", "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.2)", "circle-opacity": 0.6 } });
+          paint: { "circle-radius": 8, "circle-color": "#4F46E5", "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.25)", "circle-opacity": 0.85 } });
 
-        // Upcoming dots — green, pulsing feel via larger size
+        // Upcoming dots — green
         map.addLayer({ id: "upcoming", type: "circle", source: SOURCE,
           filter: ["all", ["==", ["get", "status"], "upcoming"], ["==", ["get", "isSelected"], false]],
-          paint: { "circle-radius": 9, "circle-color": "#3DD68C", "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.4)", "circle-opacity": 0.9 } });
+          paint: { "circle-radius": 9, "circle-color": "#3DD68C", "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.3)", "circle-opacity": 0.95 } });
 
         // Selected — prominent
         map.addLayer({ id: "selected", type: "circle", source: SOURCE,
           filter: ["==", ["get", "isSelected"], true],
-          paint: { "circle-radius": 12, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#D4A44C"],
+          paint: { "circle-radius": 12, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#4F46E5"],
             "circle-stroke-width": 3, "circle-stroke-color": "#fff", "circle-opacity": 1 } });
 
         setReady(true);
@@ -137,7 +148,7 @@ export default function MapView({ stays, selectedId, onSelect }) {
       <div ref={containerRef} className="map-container" />
       {error && <div className="map-loading">{error}</div>}
       <div className="map-legend">
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#6B7280" }} /> Past</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#4F46E5" }} /> Past</span>
         <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C", boxShadow: "0 0 6px #3DD68C80" }} /> Upcoming</span>
       </div>
     </div>

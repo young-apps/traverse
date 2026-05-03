@@ -66,6 +66,11 @@ export default function StatsView({ stays }) {
   const countries = [...new Set(past.map((s) => s.country).filter(Boolean))];
   const cities = [...new Set(past.map((s) => s.city).filter(Boolean))];
   const totalNights = past.reduce((sum, s) => sum + (s.nights || 0), 0);
+  const totalSpend = past.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+  const stayedWithCost = past.filter((s) => (s.totalCost || 0) > 0);
+  const avgPerNight = stayedWithCost.length
+    ? totalSpend / stayedWithCost.reduce((sum, s) => sum + (s.nights || 0), 0)
+    : 0;
   const rated = past.filter((s) => s.rating);
   const avg = rated.length ? rated.reduce((s, r) => s + r.rating, 0) / rated.length : 0;
   const topRated = past.filter((s) => s.rating === 5);
@@ -87,7 +92,12 @@ export default function StatsView({ stays }) {
     <div className="stats-section">
       {/* Summary */}
       <div className="stats-grid">
-        {[{ v: totalNights, l: "Nights", s: `${past.length} stays` }, { v: avg.toFixed(1), l: "Avg Rating", s: `${rated.length} rated` }, { v: cities.length, l: "Cities", s: citySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" }, { v: countries.length, l: "Countries", s: countrySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" }].map((stat, i) => (
+        {[
+          { v: totalNights, l: "Nights", s: `${past.length} stays` },
+          { v: avg.toFixed(1), l: "Avg Rating", s: `${rated.length} rated` },
+          { v: cities.length, l: "Cities", s: citySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" },
+          { v: countries.length, l: "Countries", s: countrySorted.slice(0, 2).map(([c]) => c).join(", ") || "—" },
+        ].map((stat, i) => (
           <div key={i} className="stat-card" style={{ animationDelay: `${i * 0.08}s` }}>
             <div className="stat-value">{stat.v}</div>
             <div className="stat-label">{stat.l}</div>
@@ -95,6 +105,29 @@ export default function StatsView({ stays }) {
           </div>
         ))}
       </div>
+
+      {/* Total spend — private to the user, lives only in Insights */}
+      {totalSpend > 0 && (
+        <div className="chart-section" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div className="chart-title" style={{ marginBottom: 6 }}>💰 Total Spend</div>
+            <div style={{ font: "600 28px var(--font-sans)", color: "var(--text)", letterSpacing: "-0.02em" }}>
+              ${totalSpend.toLocaleString()}
+            </div>
+            <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", marginTop: 4 }}>
+              across {stayedWithCost.length} stay{stayedWithCost.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+          {avgPerNight > 0 && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ font: "600 9px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1 }}>Avg / night</div>
+              <div style={{ font: "600 18px var(--font-sans)", color: "var(--accent)", marginTop: 4 }}>
+                ${avgPerNight.toFixed(0)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Expandable Cities */}
       {citySorted.length > 0 && <ExpandableList title="Cities" emoji="🏙" items={citySorted} unit="nights" />}
