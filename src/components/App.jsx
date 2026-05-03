@@ -6,6 +6,7 @@ import { useFriends } from "../hooks/useFriends";
 import { addStay, deleteStay, updateStay } from "../services/stays";
 import { saveUserProfile, invalidateDirectoryCache } from "../services/friends";
 import { cacheHotelPhoto } from "../services/photos";
+import { reverseGeocode } from "../services/geocode";
 import { requestNotificationPermission, scheduleStayNotifications } from "../services/notifications";
 import Auth from "./Auth";
 import Header from "./Header";
@@ -71,6 +72,19 @@ function Dashboard({ user }) {
         if (photoName && stayId) {
           cacheHotelPhoto(user.uid, stayId, photoName)
             .then((photoUrl) => { if (photoUrl) updateStay(user.uid, stayId, { photoUrl }); })
+            .catch(console.error);
+        }
+        // Reverse-geocode lat/lng -> metroArea so suburbs like Assago
+        // roll up to Milan in city/metro stats. Backfilled async so the
+        // optimistic save isn't slowed by the Mapbox round-trip; the
+        // onSnapshot listener will re-render once it lands.
+        if (stayId && stayData.lat != null && stayData.lng != null) {
+          reverseGeocode(stayData.lat, stayData.lng)
+            .then((geo) => {
+              if (!geo) return;
+              const patch = { metroArea: geo.metroArea || null, region: geo.region || null };
+              updateStay(user.uid, stayId, patch).catch(console.error);
+            })
             .catch(console.error);
         }
       })

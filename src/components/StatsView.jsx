@@ -64,7 +64,7 @@ function ExpandableList({ title, emoji, items, unit }) {
 export default function StatsView({ stays }) {
   const past = stays.filter((s) => s.status === "past");
   const countries = [...new Set(past.map((s) => s.country).filter(Boolean))];
-  const cities = [...new Set(past.map((s) => s.city).filter(Boolean))];
+  const cities = [...new Set(past.map((s) => s.metroArea || s.city).filter(Boolean))];
   const totalNights = past.reduce((sum, s) => sum + (s.nights || 0), 0);
   // Sum in USD. New entries store totalCostUSD (converted at booking
   // time); legacy entries pre-currency-feature stored only totalCost
@@ -81,7 +81,10 @@ export default function StatsView({ stays }) {
 
   const byYear = {}; past.forEach((s) => { if (!s.checkIn) return; const y = new Date(s.checkIn + "T00:00:00").getFullYear(); byYear[y] = (byYear[y] || 0) + (s.nights || 0); });
   const byCountry = {}; past.forEach((s) => { if (s.country) byCountry[s.country] = (byCountry[s.country] || 0) + (s.nights || 0); });
-  const byCity = {}; past.forEach((s) => { if (s.city) byCity[s.city] = (byCity[s.city] || 0) + (s.nights || 0); });
+  // Roll suburbs up into their primary metro area when we have one
+  // (e.g. Assago -> Milan). Falls back to s.city for legacy stays that
+  // pre-date the reverse-geocode flow.
+  const byCity = {}; past.forEach((s) => { const c = s.metroArea || s.city; if (c) byCity[c] = (byCity[c] || 0) + (s.nights || 0); });
   // Brand detection is meaningless for "stayed at a friend's place" entries.
   const byBrand = {}; past.forEach((s) => { if (s.stayType === "home") return; const b = detectBrand(s.hotel); byBrand[b] = (byBrand[b] || 0) + 1; });
   const bySource = {}; stays.forEach((s) => { if (s.bookedVia) bySource[s.bookedVia] = (bySource[s.bookedVia] || 0) + 1; });

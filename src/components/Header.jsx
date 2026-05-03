@@ -46,7 +46,7 @@ export default function Header({ user, stays }) {
 
   return (
     <header className="header">
-      {diag && <DiagPanel onClose={() => setDiag(false)} />}
+      {diag && <DiagPanel onClose={() => setDiag(false)} user={user} stays={stays} />}
       <div className="header-row">
         <div className="brand-mark" onClick={handleBrandTap} style={{ cursor: "default", userSelect: "none" }}>Traverse</div>
         <div ref={ref} style={{ position: "relative" }}>

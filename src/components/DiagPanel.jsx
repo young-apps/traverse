@@ -3,11 +3,44 @@
 // just tap-to-summon for production debugging on TestFlight/App Store.
 import { useState, useEffect } from "react";
 import { getLogs, subscribe, clearLogs } from "../services/diag";
+import { reverseGeocode } from "../services/geocode";
+import { updateStay } from "../services/stays";
 import { Capacitor } from "@capacitor/core";
 
-export default function DiagPanel({ onClose }) {
+export default function DiagPanel({ onClose, user, stays = [] }) {
   const [logs, setLogs] = useState(getLogs());
   useEffect(() => subscribe(setLogs), []);
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState(null);
+
+  // One-shot backfill: walk every stay missing `metroArea` and reverse
+  // geocode its lat/lng. Cached results mean re-running is cheap (and a
+  // no-op for stays we already patched). Throttled to avoid hammering
+  // the Mapbox endpoint when a user has hundreds of stays.
+  const handleBackfillMetro = async () => {
+    if (!user?.uid || backfilling) return;
+    const targets = stays.filter((s) => !s.metroArea && s.lat != null && s.lng != null);
+    if (!targets.length) { setBackfillStatus("All stays already have a metro area."); return; }
+    setBackfilling(true);
+    let ok = 0, fail = 0;
+    for (const s of targets) {
+      setBackfillStatus(`Backfilling ${ok + fail + 1}/${targets.length}…`);
+      try {
+        const geo = await reverseGeocode(s.lat, s.lng);
+        if (geo) {
+          await updateStay(user.uid, s.id, {
+            metroArea: geo.metroArea || null,
+            region: geo.region || null,
+          });
+          ok++;
+        } else { fail++; }
+      } catch (e) { fail++; console.warn("backfill failed", s.id, e); }
+      // gentle throttle
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    setBackfilling(false);
+    setBackfillStatus(`Done. ${ok} updated, ${fail} failed of ${targets.length}.`);
+  };
 
   const env = {
     platform: Capacitor.getPlatform(),
@@ -49,6 +82,19 @@ export default function DiagPanel({ onClose }) {
         mapboxToken={String(env.mapboxToken)} placesKey={String(env.placesKey)} firebaseKey={String(env.firebaseKey)}<br/>
         origin={env.origin}
       </div>
+      {/* Tools row — one-shot maintenance actions for the signed-in user. */}
+      {user?.uid && (
+        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={handleBackfillMetro}
+            disabled={backfilling}
+            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--accent-border)", background: "var(--accent-muted)", color: "var(--accent)", font: "11px var(--font-mono)", cursor: backfilling ? "wait" : "pointer" }}
+          >
+            {backfilling ? "Backfilling…" : `Backfill metro areas (${stays.filter((s) => !s.metroArea && s.lat != null).length})`}
+          </button>
+          {backfillStatus && <span style={{ font: "10px var(--font-mono)", color: "var(--text-dim)" }}>{backfillStatus}</span>}
+        </div>
+      )}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", font: "11px/1.45 var(--font-mono)" }}>
         {logs.length === 0 && <div style={{ color: "var(--text-dim)", padding: 20, textAlign: "center" }}>No logs yet — interact with the app to generate output.</div>}
         {logs.map((l, i) => (

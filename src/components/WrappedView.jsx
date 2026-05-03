@@ -22,14 +22,16 @@ function calcYearData(stays) {
   const hotelStays = stays.filter((s) => s.stayType !== "home");
   const totalHotels = hotelStays.length;
   const totalNights = stays.reduce((s, r) => s + (r.nights || 0), 0);
-  const cities = [...new Set(stays.map((s) => s.city).filter(Boolean))];
+  // Roll suburbs up into their metro area so "Cities" reads naturally
+  // (Assago shows up as Milan). Falls back to city for legacy stays.
+  const cities = [...new Set(stays.map((s) => s.metroArea || s.city).filter(Boolean))];
   const countries = [...new Set(stays.map((s) => s.country).filter(Boolean))];
   const rated = stays.filter((s) => s.rating);
   const avgRating = rated.length ? rated.reduce((s, r) => s + r.rating, 0) / rated.length : 0;
   const topRated = stays.filter((s) => s.rating === 5).slice(0, 3);
   const brands = {}; hotelStays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + 1; });
   const topBrand = Object.entries(brands).sort(([, a], [, b]) => b - a)[0];
-  const cityNights = {}; stays.forEach((s) => { if (s.city) cityNights[s.city] = (cityNights[s.city] || 0) + (s.nights || 0); });
+  const cityNights = {}; stays.forEach((s) => { const c = s.metroArea || s.city; if (c) cityNights[c] = (cityNights[c] || 0) + (s.nights || 0); });
   const topCity = Object.entries(cityNights).sort(([, a], [, b]) => b - a)[0];
   // Total spend is intentionally NOT included — kept private in Insights only.
   return { totalHotels, totalNights, cities, countries, avgRating, topRated, topBrand, topCity };

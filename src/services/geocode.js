@@ -12,6 +12,7 @@
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const STORAGE_KEY = "geocode_city_v1";
+const REVERSE_KEY = "geocode_reverse_v1";
 
 function loadCache() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
@@ -19,6 +20,13 @@ function loadCache() {
 }
 function saveCache(c) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(c)); } catch {}
+}
+function loadReverseCache() {
+  try { return JSON.parse(localStorage.getItem(REVERSE_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveReverseCache(c) {
+  try { localStorage.setItem(REVERSE_KEY, JSON.stringify(c)); } catch {}
 }
 
 /**
@@ -62,6 +70,68 @@ export async function geocodeCity(city, country) {
     return result;
   } catch (e) {
     console.warn("[geocode] failed", c, cy, e?.message || e);
+    return null;
+  }
+}
+
+/**
+ * Reverse geocode lat/lng -> { city, metroArea, region, country }.
+ *
+ * "metroArea" is the primary metropolitan area we want to roll suburbs
+ * into for high-level summaries. Mapbox returns a hierarchy of
+ * `place` (city/town/suburb) and `district`/`region` features in the
+ * `context` array; we pick the largest "place" or `district` feature
+ * that actually represents a real metro and fall back to the city.
+ *
+ * Example: a stay in Assago, IT geocodes to:
+ *   - text: "Assago"        (place)
+ *   - district: "Milan"     ← metroArea
+ *   - region: "Lombardy"
+ *   - country: "Italy"
+ *
+ * Cached forever in localStorage by lat/lng rounded to 3 decimals
+ * (~110m precision — close enough that two stays at the same hotel
+ * dedupe). Returns null on failure.
+ */
+export async function reverseGeocode(lat, lng) {
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  if (!TOKEN) {
+    console.warn("[geocode] VITE_MAPBOX_TOKEN missing");
+    return null;
+  }
+  const key = `${lat.toFixed(3)}|${lng.toFixed(3)}`;
+  const cache = loadReverseCache();
+  if (cache[key]) return cache[key];
+
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=place,district,region,country&limit=1&access_token=${TOKEN}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`reverse ${res.status}`);
+    const data = await res.json();
+    const f = data?.features?.[0];
+    if (!f) return null;
+    const ctx = f.context || [];
+    const findCtx = (prefix) => ctx.find((x) => (x.id || "").startsWith(prefix))?.text;
+    // The primary feature might itself be a place/district; pull
+    // metro-level data from context where available.
+    const cityText = f.place_type?.includes("place") ? f.text : findCtx("place");
+    const districtText = f.place_type?.includes("district") ? f.text : findCtx("district");
+    const regionText = findCtx("region");
+    const countryText = findCtx("country");
+    // Prefer district when it exists (e.g. Assago -> Milan); otherwise
+    // fall back to the city itself so non-suburb stays behave the same.
+    const metroArea = districtText || cityText || null;
+    const result = {
+      city: cityText || f.text || null,
+      metroArea,
+      region: regionText || null,
+      country: countryText || null,
+    };
+    cache[key] = result;
+    saveReverseCache(cache);
+    return result;
+  } catch (e) {
+    console.warn("[geocode] reverse failed", lat, lng, e?.message || e);
     return null;
   }
 }
