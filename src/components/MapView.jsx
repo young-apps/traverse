@@ -1,18 +1,18 @@
 // MapView — interactive Mapbox map with tappable markers + clean popovers
 import { useEffect, useRef, useState, useCallback } from "react";
-// Import from the ESM build path explicitly. mapbox-gl's package.json
-// resolves to a UMD bundle by default, and our optimizeDeps.exclude
-// (needed for the inline worker below) blocks Vite from rewriting that
-// UMD into ESM — leaving us with no `default` export at runtime.
-import mapboxgl from "mapbox-gl/dist/esm-min/mapbox-gl.js";
-// Inline the Mapbox worker so it's same-origin in Capacitor's WebView.
-// Without this, the worker loads as a cross-origin script and throws
-// an opaque "Script error :0" that crashes the entire app.
+// Use the CSP build of mapbox-gl. The regular esm-min build has a
+// fallback `new Worker('./worker.js')` baked in; in production that
+// resolves to /assets/worker.js which Vite never emits, 404s, and
+// the map silently fails. The CSP build has no implicit worker URL
+// — it requires us to set `workerClass`, which we do below with the
+// inlined worker module.
+import mapboxgl from "mapbox-gl/dist/mapbox-gl-csp";
+// Inline the Mapbox CSP worker so it's same-origin in Capacitor's
+// WebView and a base64 blob in browser builds. No external fetch.
 import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
 mapboxgl.workerClass = MapboxWorker;
 // Mapbox GL ships its canvas/control styles separately. Without this
-// import the GL canvas renders at 0×0 inside .map-container and you
-// see only the container background — i.e. "the map is blank".
+// import the GL canvas renders at 0×0 inside .map-container.
 import "mapbox-gl/dist/mapbox-gl.css";
 
 // Surface missing-token early so iOS App Store builds don't render a
