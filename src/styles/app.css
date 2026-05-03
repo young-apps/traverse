@@ -266,3 +266,32 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 /* Footer */
 .footer { padding: 24px 20px 100px; text-align: center; border-top: 1px solid var(--border); }
 .footer-text { font: 10px var(--font-mono); color: var(--text-dim); text-transform: uppercase; letter-spacing: 2.5px; }
+
+/* ─── Pin-drop celebration ───────────────────────────────────────
+   Brief animation after saving a stay. Pin falls in from above,
+   bounces, and a soft ring pulses outward. ~2.5s total. */
+.pin-drop { position: relative; width: 22px; height: 30px; pointer-events: none; }
+.pin-drop-dot {
+  position: absolute; left: 50%; bottom: 0; width: 18px; height: 18px;
+  margin-left: -9px; border-radius: 50% 50% 50% 0;
+  background: #3DD68C; border: 2px solid #fff;
+  box-shadow: 0 4px 10px rgba(15,23,42,0.35);
+  transform: rotate(-45deg) translateY(-120px);
+  animation: pinFall 0.7s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+.pin-drop-pulse {
+  position: absolute; left: 50%; bottom: 0; width: 18px; height: 18px;
+  margin-left: -9px; border-radius: 50%;
+  background: rgba(61,214,140,0.45);
+  opacity: 0; animation: pinPulse 1.4s ease-out 0.7s 2;
+}
+@keyframes pinFall {
+  0%   { transform: rotate(-45deg) translateY(-120px); opacity: 0; }
+  60%  { transform: rotate(-45deg) translateY(8px); opacity: 1; }
+  80%  { transform: rotate(-45deg) translateY(-4px); }
+  100% { transform: rotate(-45deg) translateY(0); opacity: 1; }
+}
+@keyframes pinPulse {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}

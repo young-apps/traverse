@@ -56,6 +56,7 @@ function Dashboard({ user }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editStay, setEditStay] = useState(null);
   const [justAdded, setJustAdded] = useState(null);
+  const [celebrate, setCelebrate] = useState(null); // {lat, lng, key} for pin-drop animation
 
   useEffect(() => { if (stays.length) scheduleStayNotifications(stays); }, [stays]);
 
@@ -70,6 +71,12 @@ function Dashboard({ user }) {
       .then((stayId) => {
         setJustAdded(stayData.hotel);
         setTimeout(() => setJustAdded(null), 3000);
+        // Trigger pin-drop celebration on the home map.
+        if (stayData.lat != null && stayData.lng != null) {
+          setCelebrate({ lat: stayData.lat, lng: stayData.lng, key: Date.now() });
+          setTab("home");
+          setTimeout(() => setCelebrate(null), 3200);
+        }
         if (photoName && stayId) {
           cacheHotelPhoto(user.uid, stayId, photoName)
             .then((photoUrl) => { if (photoUrl) updateStay(user.uid, stayId, { photoUrl }); })
@@ -110,7 +117,7 @@ function Dashboard({ user }) {
       {tab === "home" && (
         <>
           <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
-            <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} />
+            <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} celebrateAt={celebrate} />
           </Suspense>
           <ScrollContextHeader />
           {upcoming.length > 0 && (

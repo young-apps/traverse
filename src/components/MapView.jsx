@@ -41,7 +41,7 @@ function staysToGeoJSON(stays, selectedId) {
 
 const fmtD = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
-export default function MapView({ stays, selectedId, onSelect }) {
+export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -136,6 +136,21 @@ export default function MapView({ stays, selectedId, onSelect }) {
     const s = stays.find((x) => x.id === selectedId);
     if (s?.lat) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 11, duration: 1200 });
   }, [selectedId]);
+
+  // Pin-drop celebration: when a stay is saved, fly to it and pulse a marker.
+  useEffect(() => {
+    if (!mapRef.current || !ready || !celebrateAt) return;
+    const { lat, lng, key } = celebrateAt;
+    if (typeof lat !== "number" || typeof lng !== "number") return;
+    mapRef.current.flyTo({ center: [lng, lat], zoom: 6, duration: 1400, essential: true });
+    const el = document.createElement("div");
+    el.className = "pin-drop";
+    el.innerHTML = '<span class="pin-drop-pulse"></span><span class="pin-drop-dot"></span>';
+    const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+      .setLngLat([lng, lat]).addTo(mapRef.current);
+    const t = setTimeout(() => marker.remove(), 3000);
+    return () => { clearTimeout(t); marker.remove(); };
+  }, [celebrateAt?.key, ready]);
 
   // Fit all on load
   useEffect(() => {
