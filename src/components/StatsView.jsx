@@ -1,5 +1,6 @@
 // StatsView — tappable cities/countries with full lists, larger fonts
 import { useState } from "react";
+import { continentalFootprint, travelCadence, longestStreak, leadTimeStats, yoyNightsToDate } from "../services/insights";
 
 const fmtShort = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
 
@@ -109,6 +110,13 @@ export default function StatsView({ stays }) {
   const countrySorted = Object.entries(byCountry).sort(([, a], [, b]) => b - a);
   const citySorted = Object.entries(byCity).sort(([, a], [, b]) => b - a);
 
+  // ─── Phase 5 derived metrics ───────────────────────────────────
+  const footprint = continentalFootprint(past);
+  const cadenceDays = travelCadence(stays);
+  const streak = longestStreak(stays);
+  const leadTime = leadTimeStats(stays);
+  const yoy = yoyNightsToDate(stays);
+
   if (!stays.length) return <div className="stats-section"><div className="empty-state">Add stays to see your insights.</div></div>;
 
   return (
@@ -151,6 +159,88 @@ export default function StatsView({ stays }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Year-over-year ─── */}
+      {yoy && (yoy.thisYear || yoy.lastYear) > 0 && (
+        <div className="chart-section">
+          <div className="chart-title">📅 {yoy.currentYear} vs {yoy.prevYear}</div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ font: "600 28px var(--font-sans)", color: "var(--text)", letterSpacing: "-0.02em" }}>{yoy.thisYear}</div>
+              <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>nights so far in {yoy.currentYear}</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "right" }}>
+              <div style={{ font: "600 14px var(--font-mono)", color: yoy.diff > 0 ? "var(--green)" : yoy.diff < 0 ? "var(--red)" : "var(--text-dim)" }}>
+                {yoy.diff > 0 ? `+${yoy.diff}` : yoy.diff} vs last year
+              </div>
+              <div style={{ font: "10px var(--font-mono)", color: "var(--text-dim)", marginTop: 2 }}>
+                {yoy.lastYear} by this date in {yoy.prevYear}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Travel velocity ─── */}
+      {(cadenceDays || streak > 0) && (
+        <div className="chart-section">
+          <div className="chart-title">⚡ Travel Velocity</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            {cadenceDays && (
+              <div style={{ flex: 1 }}>
+                <div style={{ font: "600 22px var(--font-sans)", color: "var(--text)" }}>1 / {cadenceDays}d</div>
+                <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>one stay every {cadenceDays} days</div>
+              </div>
+            )}
+            {streak > 0 && (
+              <div style={{ flex: 1, textAlign: cadenceDays ? "right" : "left" }}>
+                <div style={{ font: "600 22px var(--font-sans)", color: "var(--text)" }}>{streak}</div>
+                <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>longest streak (consecutive nights away)</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Lead-time / booking habits ─── */}
+      {leadTime && (
+        <div className="chart-section">
+          <div className="chart-title">📆 Booking Lead Time</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ font: "600 22px var(--font-sans)", color: "var(--text)" }}>{leadTime.median}d</div>
+              <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>typical days ahead (median)</div>
+            </div>
+            <div style={{ flex: 1, textAlign: "right" }}>
+              <div style={{ font: "600 14px var(--font-mono)", color: "var(--text-secondary)" }}>avg {leadTime.avg}d</div>
+              <div style={{ font: "10px var(--font-mono)", color: "var(--text-dim)", marginTop: 2 }}>
+                across {leadTime.samples} stay{leadTime.samples !== 1 ? "s" : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Continental footprint ─── */}
+      {footprint.length > 0 && (
+        <div className="chart-section">
+          <div className="chart-title">🌐 Continental Footprint</div>
+          {footprint.map((c) => (
+            <div key={c.continent} className="bar-row">
+              <span style={{ width: 110, font: "13px var(--font-sans)", color: "var(--text-secondary)", flexShrink: 0 }}>{c.continent}</span>
+              <div className="bar-track">
+                <div className="bar-fill" style={{ width: `${Math.max(c.pct, 4)}%`, background: "var(--accent)", opacity: 0.65 }}>
+                  <span className="bar-value">{c.pct < 1 ? "<1%" : `${Math.round(c.pct)}%`}</span>
+                </div>
+              </div>
+              <span style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", marginLeft: 8 }}>{c.visited}/{c.total}</span>
+            </div>
+          ))}
+          <div style={{ font: "10px var(--font-mono)", color: "var(--text-dim)", marginTop: 8, lineHeight: 1.5 }}>
+            Percentages count distinct UN-member countries visited. A trip to Vatican City weighs the same as one to France — coverage breadth, not territory size.
+          </div>
         </div>
       )}
 
