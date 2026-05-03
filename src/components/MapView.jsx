@@ -11,7 +11,11 @@ import mapboxgl from "mapbox-gl/dist/esm-min/mapbox-gl.js";
 import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
 mapboxgl.workerClass = MapboxWorker;
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+// Surface missing-token early so iOS App Store builds don't render a
+// silently-blank map when the env var didn't get baked in.
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+if (!MAPBOX_TOKEN) console.error("[MapView] VITE_MAPBOX_TOKEN missing from build");
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
 const SOURCE = "stays-src";
 

@@ -15,7 +15,7 @@ import {
   browserLocalPersistence,
   browserPopupRedirectResolver,
 } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Capacitor } from "@capacitor/core";
 
@@ -41,5 +41,14 @@ export const auth = initializeAuth(app, {
   popupRedirectResolver: isNative ? undefined : browserPopupRedirectResolver,
 });
 
-export const db = getFirestore(app);
+// Firestore on Capacitor iOS: WKWebView at capacitor://localhost can't
+// reliably negotiate WebChannel streaming, so onSnapshot listeners hang
+// forever (sign-in works, but stays/friends never load — the map renders
+// blank). Forcing long-polling on native swaps in plain HTTP requests
+// which WKWebView handles fine. We let the SDK auto-detect on web so
+// browser dev keeps the faster WebChannel path.
+export const db = initializeFirestore(app, isNative
+  ? { experimentalForceLongPolling: true, useFetchStreams: false }
+  : { experimentalAutoDetectLongPolling: true }
+);
 export const storage = getStorage(app);
