@@ -1,5 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { installDiag } from "./services/diag";
+
+// Install the in-app diagnostic logger BEFORE anything else so it captures
+// all console output, fetches, and errors from app start.
+installDiag();
 
 // On-device error overlay — renders a fixed-position banner above #root.
 // Critical: never clobber #root.innerHTML, since React owns that subtree

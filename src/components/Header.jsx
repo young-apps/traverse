@@ -1,11 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import { signOut } from "../services/auth";
 import { deleteAccount } from "../services/account";
+import DiagPanel from "./DiagPanel";
 
 export default function Header({ user, stays }) {
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [diag, setDiag] = useState(false);
+  const tapsRef = useRef({ count: 0, last: 0 });
   const ref = useRef(null);
+
+  // Tap the brand mark 5 times within 3s to open the diagnostic panel.
+  // No menu, no build flag — works on TestFlight/App Store.
+  const handleBrandTap = () => {
+    const now = Date.now();
+    const t = tapsRef.current;
+    t.count = now - t.last < 3000 ? t.count + 1 : 1;
+    t.last = now;
+    if (t.count >= 5) { t.count = 0; setDiag(true); }
+  };
   useEffect(() => { const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
 
   const past = stays.filter((s) => s.status === "past");
@@ -31,8 +44,9 @@ export default function Header({ user, stays }) {
 
   return (
     <header className="header">
+      {diag && <DiagPanel onClose={() => setDiag(false)} />}
       <div className="header-row">
-        <div className="brand-mark">Traverse</div>
+        <div className="brand-mark" onClick={handleBrandTap} style={{ cursor: "default", userSelect: "none" }}>Traverse</div>
         <div ref={ref} style={{ position: "relative" }}>
           <button className="user-menu-btn" onClick={() => setOpen((v) => !v)}>
             <div className="user-avatar">

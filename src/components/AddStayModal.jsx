@@ -39,7 +39,13 @@ export default function AddStayModal({ onClose, onAdd }) {
   const doSearch = useCallback(async (q) => {
     setSearching(true); setSearchError(null);
     try { const h = await searchHotels(q); setResults(h); if (!h.length) setSearchError("No hotels found."); }
-    catch (e) { setSearchError("Search failed."); setResults([]); }
+    catch (e) {
+      // Surface the real reason — silent "Search failed." was hiding 403s
+      // from API key restrictions and missing-key errors on App Store builds.
+      const detail = (e?.message || String(e)).slice(0, 180);
+      setSearchError(`Search failed: ${detail}`);
+      setResults([]);
+    }
     setSearching(false);
   }, []);
 
