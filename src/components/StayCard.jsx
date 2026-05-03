@@ -2,6 +2,8 @@
 import { formatMoney } from "../services/fx";
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 const fmtYear = (d) => d ? new Date(d + "T00:00:00").getFullYear() : "";
+// "Jan 2026" — used by ScrollContextHeader's data-month-year attribute.
+const fmtMonthYear = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
 
 export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit }) {
   const up = stay.status === "upcoming";
@@ -14,6 +16,9 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
 
   return (
     <div className={`stay-card ${isSelected ? "selected" : ""} ${up ? "upcoming" : "past"}`}
+      data-stay-id={stay.id}
+      data-country={stay.country || ""}
+      data-month-year={fmtMonthYear(stay.checkIn)}
       onClick={() => onSelect(stay.id)}>
       <div className="stay-main">
         <div className="stay-left">

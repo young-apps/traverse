@@ -18,6 +18,7 @@ import Header from "./Header";
 const MapView = lazy(() => import("./MapView"));
 import StayList from "./StayList";
 import StayCard from "./StayCard";
+import ScrollContextHeader from "./ScrollContextHeader";
 import AddStayModal from "./AddStayModal";
 import EditStayModal from "./EditStayModal";
 import StatsView from "./StatsView";
@@ -111,6 +112,7 @@ function Dashboard({ user }) {
           <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
             <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} />
           </Suspense>
+          <ScrollContextHeader />
           {upcoming.length > 0 && (
             <div className="section">
               <div className="section-title">Upcoming Stays</div>
@@ -148,9 +150,12 @@ function Dashboard({ user }) {
 
       {/* ─── MY STAYS ─── */}
       {tab === "stays" && (
-        <StayList stays={stays} selectedId={selectedId}
-          onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
-          onDelete={handleDelete} onAdd={() => setShowAdd(true)} onEdit={setEditStay} />
+        <>
+          <ScrollContextHeader />
+          <StayList stays={stays} selectedId={selectedId}
+            onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
+            onDelete={handleDelete} onAdd={() => setShowAdd(true)} onEdit={setEditStay} />
+        </>
       )}
 
       {/* ─── INSIGHTS ─── */}

@@ -37,6 +37,13 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .auth-legal a:hover { text-decoration: underline; }
 .loading-text { font: 12px var(--font-mono); color: var(--text-dim); }
 
+/* Scroll context header — sticky bar that mirrors the country + month
+   of the topmost visible stay card. */
+.scroll-ctx { position: sticky; top: 0; z-index: 50; padding: 8px 20px; background: rgba(255, 255, 255, .82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font: 600 12px var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.2px; transition: opacity .15s ease; }
+.scroll-ctx-country { color: var(--text); }
+.scroll-ctx-dot { color: var(--text-dim); }
+.scroll-ctx-month { color: var(--text-secondary); }
+
 /* Header */
 .header { padding: 20px 20px 12px; }
 .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
