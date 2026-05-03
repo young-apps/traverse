@@ -10,6 +10,10 @@ import mapboxgl from "mapbox-gl/dist/esm-min/mapbox-gl.js";
 // an opaque "Script error :0" that crashes the entire app.
 import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
 mapboxgl.workerClass = MapboxWorker;
+// Mapbox GL ships its canvas/control styles separately. Without this
+// import the GL canvas renders at 0×0 inside .map-container and you
+// see only the container background — i.e. "the map is blank".
+import "mapbox-gl/dist/mapbox-gl.css";
 
 // Surface missing-token early so iOS App Store builds don't render a
 // silently-blank map when the env var didn't get baked in.
