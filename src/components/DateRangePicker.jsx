@@ -32,29 +32,46 @@ export default function DateRangePicker({ startDate, endDate, onChange }) {
     else setViewMonth(viewMonth + 1);
   };
 
-  // Generate calendar grid — Sunday = 0
+  // Generate calendar grid — Sunday = 0. Leading/trailing cells now
+  // carry real dates (from prev/next month) so users can click straight
+  // through a month boundary without paging — addresses friend feedback
+  // that month-boundary days were visible-but-unselectable.
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
     const lastDay = new Date(viewYear, viewMonth + 1, 0);
-    const startPad = firstDay.getDay(); // Sunday = 0, already correct
+    const startPad = firstDay.getDay(); // Sunday = 0
     const days = [];
 
     const prevLast = new Date(viewYear, viewMonth, 0).getDate();
+    const prevRef = new Date(viewYear, viewMonth - 1, 1);
+    const prevY = prevRef.getFullYear();
+    const prevM = prevRef.getMonth();
     for (let i = startPad - 1; i >= 0; i--) {
-      days.push({ day: prevLast - i, inMonth: false, date: null });
+      const day = prevLast - i;
+      days.push({ day, inMonth: false, date: toDateStr(prevY, prevM, day) });
     }
     for (let d = 1; d <= lastDay.getDate(); d++) {
       days.push({ day: d, inMonth: true, date: toDateStr(viewYear, viewMonth, d) });
     }
     const remaining = 42 - days.length;
+    const nextRef = new Date(viewYear, viewMonth + 1, 1);
+    const nextY = nextRef.getFullYear();
+    const nextM = nextRef.getMonth();
     for (let d = 1; d <= remaining; d++) {
-      days.push({ day: d, inMonth: false, date: null });
+      days.push({ day: d, inMonth: false, date: toDateStr(nextY, nextM, d) });
     }
     return days;
   }, [viewYear, viewMonth]);
 
   const handleDayClick = (dateStr) => {
     if (!dateStr) return;
+    // If the user tapped a leading/trailing cell from an adjacent month,
+    // page the view to that month so the selection is visually anchored.
+    const picked = parseDateStr(dateStr);
+    if (picked.getFullYear() !== viewYear || picked.getMonth() !== viewMonth) {
+      setViewYear(picked.getFullYear());
+      setViewMonth(picked.getMonth());
+    }
     if (selecting === "start") {
       onChange(dateStr, "");
       setSelecting("end");
@@ -128,9 +145,9 @@ export default function DateRangePicker({ startDate, endDate, onChange }) {
           const state = getDayState(cell.date);
           const isToday = cell.date === today;
           return (
-            <button key={i} onClick={() => handleDayClick(cell.date)} disabled={!cell.inMonth}
+            <button key={i} onClick={() => handleDayClick(cell.date)}
               style={{
-                padding: "7px 0", border: "none", cursor: cell.inMonth ? "pointer" : "default",
+                padding: "7px 0", border: "none", cursor: "pointer",
                 borderRadius: state === "start" ? "8px 0 0 8px" : state === "end" ? "0 8px 8px 0" : state === "both" ? "8px" : state === "range" ? "0" : "8px",
                 background: (state === "start" || state === "end" || state === "both") ? "var(--accent)" : state === "range" ? "var(--accent-muted)" : "transparent",
                 color: !cell.inMonth ? "var(--text-dim)" : (state === "start" || state === "end" || state === "both") ? "var(--bg)" : state === "range" ? "var(--accent)" : isToday ? "var(--accent)" : "var(--text)",

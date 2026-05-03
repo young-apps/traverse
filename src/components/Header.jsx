@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { signOut } from "../services/auth";
 import { deleteAccount } from "../services/account";
+import { TERMS_URL, openExternal } from "../services/links";
 import DiagPanel from "./DiagPanel";
 
 export default function Header({ user, stays }) {
@@ -59,8 +60,12 @@ export default function Header({ user, stays }) {
                 <div className="user-menu-name">{user.displayName || "Signed in"}</div>
                 <div className="user-menu-email">{user.email}</div>
               </div>
-              <a className="user-menu-item" href="/privacy.html" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
-                Privacy policy
+              <a
+                className="user-menu-item"
+                href={TERMS_URL}
+                onClick={(e) => { e.preventDefault(); setOpen(false); openExternal(TERMS_URL); }}
+              >
+                Terms &amp; Privacy
               </a>
               <button className="user-menu-item" onClick={async () => { setOpen(false); await signOut(); }}>
                 Sign out

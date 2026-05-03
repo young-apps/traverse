@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { signInWithGoogle, signInWithApple } from "../services/auth";
+import { TERMS_URL, openExternal } from "../services/links";
 
 export default function Auth() {
   const [loading, setLoading] = useState(null); // "google" | "apple" | null
@@ -48,7 +49,7 @@ export default function Auth() {
 
       <p className="auth-legal">
         By continuing you agree to our{" "}
-        <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+        <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); openExternal(TERMS_URL); }}>Terms &amp; Privacy Policy</a>.
       </p>
     </div>
   );
