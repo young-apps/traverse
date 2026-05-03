@@ -1,6 +1,6 @@
 // FriendsView — with privacy disclaimer + opt-in stay-sharing toggle
 import { useState, useEffect } from "react";
-import { searchUsers, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
+import { searchUsers, listAllUsers, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
 import { TERMS_URL } from "../services/links";
 
 const fmt = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
@@ -9,6 +9,7 @@ const fmtS = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { 
 export default function FriendsView({ user, friends, requests, friendStays, onRefresh }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]); // name-search candidates
+  const [allUsers, setAllUsers] = useState([]); // full directory shown when search is empty
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -34,6 +35,20 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
     } catch (e) { console.error("toggle sharing failed", e); }
     setSavingShare(false);
   };
+
+  // Preload the full directory on mount so the user can see every signed-up
+  // account before they type a single character. Same single cached read
+  // that powers searchUsers(), so no extra Firestore traffic.
+  useEffect(() => {
+    let cancelled = false;
+    listAllUsers()
+      .then((list) => {
+        if (cancelled) return;
+        setAllUsers(list.filter((p) => p.uid !== user.uid));
+      })
+      .catch((e) => console.warn("directory load failed", e));
+    return () => { cancelled = true; };
+  }, [user.uid]);
 
   // Fuzzy search across displayName + email. The directory is fetched
   // once and cached in memory by services/friends.js, so each keystroke
@@ -183,27 +198,41 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
           placeholder="Search any name or email…" value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)} />
 
-        {/* Candidate list — appears as you type */}
-        {(searching || searchResults.length > 0) && (
-          <div style={{ marginTop: 8, borderRadius: 10, overflow: "hidden", background: "var(--bg-2)", border: "1px solid var(--border)" }}>
-            {searching && <div style={{ padding: "10px 12px", font: "12px var(--font-mono)", color: "var(--text-dim)" }}>Searching…</div>}
-            {!searching && searchResults.map((p) => (
-              <div key={p.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--border)" }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-                  {p.photoURL ? <img src={p.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ font: "600 11px var(--font-mono)", color: "var(--text-dim)" }}>{(p.displayName || p.email || "?").charAt(0).toUpperCase()}</span>}
+        {/* Candidate list — when there's a query, show fuzzy matches; otherwise
+            show the entire directory minus self + already-friends, so users
+            can browse who's on the app without having to guess names. */}
+        {(() => {
+          const hasQuery = searchQuery.trim().length > 0;
+          const browseList = allUsers.filter((p) => !friends.some((f) => f.friendUid === p.uid));
+          const list = hasQuery ? searchResults : browseList;
+          const showSection = searching || list.length > 0;
+          if (!showSection) return null;
+          return (
+            <div style={{ marginTop: 8, borderRadius: 10, overflow: "hidden", background: "var(--bg-2)", border: "1px solid var(--border)" }}>
+              {!hasQuery && list.length > 0 && (
+                <div style={{ padding: "8px 12px", font: "600 10px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1.2, background: "var(--surface)" }}>
+                  Everyone on Traverse · {list.length}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ font: "500 13px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName || p.email}</div>
-                  <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.email}</div>
+              )}
+              {searching && <div style={{ padding: "10px 12px", font: "12px var(--font-mono)", color: "var(--text-dim)" }}>Searching…</div>}
+              {!searching && list.map((p) => (
+                <div key={p.uid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderTop: "1px solid var(--border)" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                    {p.photoURL ? <img src={p.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ font: "600 11px var(--font-mono)", color: "var(--text-dim)" }}>{(p.displayName || p.email || "?").charAt(0).toUpperCase()}</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ font: "500 13px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.displayName || p.email}</div>
+                    <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.email}</div>
+                  </div>
+                  <button onClick={() => handleSendRequestTo(p)} style={{
+                    padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--accent)",
+                    color: "var(--bg)", font: "700 11px var(--font-sans)", cursor: "pointer", flexShrink: 0,
+                  }}>Add</button>
                 </div>
-                <button onClick={() => handleSendRequestTo(p)} style={{
-                  padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--accent)",
-                  color: "var(--bg)", font: "700 11px var(--font-sans)", cursor: "pointer", flexShrink: 0,
-                }}>Add</button>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
         {error && <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(240,96,80,0.08)", border: "1px solid rgba(240,96,80,0.15)", color: "var(--red)", font: "12px var(--font-sans)", lineHeight: 1.4 }}>{error}</div>}
         {success && <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "var(--green-muted)", border: "1px solid rgba(61,214,140,0.2)", color: "var(--green)", font: "12px var(--font-mono)" }}>{success}</div>}

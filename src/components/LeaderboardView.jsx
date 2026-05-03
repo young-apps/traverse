@@ -3,7 +3,9 @@
 // in the user's own Insights tab only.)
 function calcStats(stays) {
   const past = stays.filter((s) => s.status === "past");
-  const totalHotels = past.length;
+  // "Hotels Visited" means actual hotels — friend/family-home stays count
+  // toward nights and other metrics but not toward this hotel-leaderboard.
+  const totalHotels = past.filter((s) => s.stayType !== "home").length;
   const totalNights = past.reduce((sum, s) => sum + (s.nights || 0), 0);
   const years = new Set(past.map((s) => s.checkIn ? new Date(s.checkIn + "T00:00:00").getFullYear() : null).filter(Boolean));
   const nightsPerYear = years.size > 0 ? totalNights / years.size : 0;

@@ -84,6 +84,18 @@ export function invalidateDirectoryCache() {
 }
 
 /**
+ * Return every profile in the directory (sorted by displayName, then email).
+ * Used to populate the friend search list before the user types — at our
+ * scale this is the same single cached read that powers searchUsers().
+ */
+export async function listAllUsers() {
+  const profiles = await loadDirectory();
+  return [...profiles].sort((a, b) =>
+    (a.displayName || a.email || "").localeCompare(b.displayName || b.email || "")
+  );
+}
+
+/**
  * Fuzzy search across displayName, displayNameLower, and email.
  * Case-insensitive substring match. Returns up to 12 results, ranked
  * by where the match occurred (name prefix > name contains > email

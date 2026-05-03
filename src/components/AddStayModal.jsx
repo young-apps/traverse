@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { searchHotels } from "../services/places";
 import { convertToUSD, formatMoney } from "../services/fx";
+import { geocodeCity } from "../services/geocode";
 import DateRangePicker from "./DateRangePicker";
 import { ROOM_TYPES, BED_TYPES, VIEW_TYPES, CLUB_ACCESS, UPGRADE_STATUS, BOOKING_SOURCES, TRIP_PURPOSES, CURRENCIES } from "../constants";
 
@@ -23,6 +24,15 @@ function ChipPicker({ options, value, onChange, label }) {
 }
 
 export default function AddStayModal({ onClose, onAdd }) {
+  // "hotel" runs the Google Places search flow as before. "home" lets
+  // the user log a stay at a friend or family home with just a place
+  // name + city/country -- geocoded via Mapbox so the marker still
+  // appears on the map. Counts toward nights/cities/countries; excluded
+  // from "Hotels Visited" and brand stats.
+  const [stayType, setStayType] = useState("hotel");
+  const [homeName, setHomeName] = useState(""); // e.g. "Mom's house"
+  const [homeCity, setHomeCity] = useState("");
+  const [homeCountry, setHomeCountry] = useState("");
   const [query, setQuery] = useState(""); const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false); const [searchError, setSearchError] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -62,26 +72,56 @@ export default function AddStayModal({ onClose, onAdd }) {
   const nights = useMemo(() => { if (!checkIn || !checkOut) return 0; return Math.max(0, Math.round((new Date(checkOut) - new Date(checkIn)) / 864e5)); }, [checkIn, checkOut]);
   const isPast = useMemo(() => !checkOut || checkOut < new Date().toISOString().split("T")[0], [checkOut]);
   const total = costMode === "nightly" && costPerNight && nights > 0 ? Math.round(parseFloat(costPerNight) * nights) : costMode === "total" && totalCostM ? parseInt(totalCostM) : null;
-  const canAdd = selected && checkIn && checkOut && nights > 0;
+  const canAdd = stayType === "hotel"
+    ? Boolean(selected && checkIn && checkOut && nights > 0)
+    : Boolean(homeName.trim() && homeCity.trim() && checkIn && checkOut && nights > 0);
 
   const handleSubmit = async () => {
     if (!canAdd || submitting) return;
     setSubmitting(true);
-    // Convert cost once at booking-time. Stored as USD on the doc so
-    // every later read (stats, leaderboard, wrapped) is zero-cost.
+
+    // FX conversion (same for both stay types).
     let totalCostUSD = null, fxRate = null, fxDate = null;
     if (total > 0) {
       const conv = await convertToUSD(total, currency, checkIn);
       if (conv) { totalCostUSD = conv.usd; fxRate = conv.rate; fxDate = conv.rateDate; }
     }
+
+    let payload;
+    if (stayType === "home") {
+      // Geocode "City, Country" -> centroid lat/lng. If geocoding fails
+      // (offline, unknown city) we still save the stay, just without a
+      // map pin -- it'll show in lists/stats and the user can edit later.
+      const geo = await geocodeCity(homeCity, homeCountry);
+      payload = {
+        stayType: "home",
+        hotel: homeName.trim(),
+        city: geo?.city || homeCity.trim(),
+        country: geo?.country || homeCountry.trim(),
+        lat: geo?.lat ?? null,
+        lng: geo?.lng ?? null,
+        address: geo?.placeName || `${homeCity.trim()}${homeCountry.trim() ? ", " + homeCountry.trim() : ""}`,
+        placeId: null, photoName: null,
+        // Hotel-specific fields are nulled so stats can cleanly skip them.
+        roomType: null, bedType: null, viewType: null,
+        clubAccess: null, upgradeStatus: null,
+        bookedVia: null, loyaltyNumber: null,
+      };
+    } else {
+      payload = {
+        stayType: "hotel",
+        hotel: selected.name, city: selected.city, country: selected.country,
+        lat: selected.lat, lng: selected.lng, address: selected.address, placeId: selected.placeId || null,
+        photoName: selected.photoName || null,
+        roomType: roomType || null, bedType: bedType || null, viewType: viewType || null,
+        clubAccess: clubAccess || null, upgradeStatus: upgradeStatus || null,
+        bookedVia: bookedVia || null, loyaltyNumber: loyaltyNumber || null,
+      };
+    }
+
     onAdd({
-      hotel: selected.name, city: selected.city, country: selected.country,
-      lat: selected.lat, lng: selected.lng, address: selected.address, placeId: selected.placeId || null,
-      photoName: selected.photoName || null,
+      ...payload,
       checkIn, checkOut, nights, rating: isPast ? rating : null,
-      roomType: roomType || null, bedType: bedType || null, viewType: viewType || null,
-      clubAccess: clubAccess || null, upgradeStatus: upgradeStatus || null,
-      bookedVia: bookedVia || null, loyaltyNumber: loyaltyNumber || null,
       costPerNight: costMode === "nightly" && costPerNight ? parseFloat(costPerNight) : null,
       totalCost: total,
       currency: total > 0 ? currency : null,
@@ -98,33 +138,68 @@ export default function AddStayModal({ onClose, onAdd }) {
           <button className="btn-icon" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <label className="field-label">Hotel</label>
-          <div style={{ position: "relative", marginBottom: 4 }}>
-            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }}>{searching ? <span className="spin">⏳</span> : "🔍"}</span>
-            <input className="field-input" style={{ paddingLeft: 36 }} placeholder='Search "Marriott London"' value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null); }} autoFocus />
+          {/* Stay type toggle — Hotel uses Google Places, Home is a free-form
+              "stayed with friends/family" entry geocoded by city. */}
+          <label className="field-label">Stay Type</label>
+          <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+            {[{ id: "hotel", label: "Hotel" }, { id: "home", label: "Friend / Family Home" }].map((t) => (
+              <button key={t.id} onClick={() => setStayType(t.id)} style={{
+                flex: 1, padding: "8px 12px", borderRadius: 8,
+                border: `1px solid ${stayType === t.id ? "var(--accent-border)" : "var(--border)"}`,
+                background: stayType === t.id ? "var(--accent-muted)" : "transparent",
+                color: stayType === t.id ? "var(--accent)" : "var(--text-dim)",
+                font: "500 12px var(--font-sans)", cursor: "pointer",
+              }}>{t.label}</button>
+            ))}
           </div>
-          {searching && <div className="search-status">Searching…</div>}
-          {!selected && !searching && results.length > 0 && (
-            <div className="search-results">{results.map((r, i) => (
-              <div key={r.placeId || i} className="search-result" onClick={() => { setSelected(r); setQuery(r.name); setResults([]); }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ color: "var(--accent)" }}>📍</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ font: "500 14px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
-                    <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>{r.city}{r.city && r.country ? ", " : ""}{r.country}</div>
+
+          {stayType === "hotel" && (<>
+            <label className="field-label">Hotel</label>
+            <div style={{ position: "relative", marginBottom: 4 }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }}>{searching ? <span className="spin">⏳</span> : "🔍"}</span>
+              <input className="field-input" style={{ paddingLeft: 36 }} placeholder='Search "Marriott London"' value={query} onChange={(e) => { setQuery(e.target.value); setSelected(null); }} autoFocus />
+            </div>
+            {searching && <div className="search-status">Searching…</div>}
+            {!selected && !searching && results.length > 0 && (
+              <div className="search-results">{results.map((r, i) => (
+                <div key={r.placeId || i} className="search-result" onClick={() => { setSelected(r); setQuery(r.name); setResults([]); }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ color: "var(--accent)" }}>📍</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ font: "500 14px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                      <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>{r.city}{r.city && r.country ? ", " : ""}{r.country}</div>
+                    </div>
                   </div>
                 </div>
+              ))}</div>
+            )}
+            {!selected && !searching && searchError && <div className="search-status empty">{searchError}</div>}
+            {selected && (
+              <div className="selected-pill">
+                <span style={{ color: "var(--accent)" }}>📍</span>
+                <div style={{ flex: 1 }}><div style={{ font: "600 14px var(--font-sans)", color: "var(--text)" }}>{selected.name}</div><div style={{ font: "11px var(--font-mono)", color: "var(--text-secondary)" }}>{selected.address}</div></div>
+                <button className="btn-icon" style={{ flexShrink: 0, width: 24, height: 24, fontSize: 11 }} onClick={() => { setSelected(null); setQuery(""); }}>✕</button>
               </div>
-            ))}</div>
-          )}
-          {!selected && !searching && searchError && <div className="search-status empty">{searchError}</div>}
-          {selected && (
-            <div className="selected-pill">
-              <span style={{ color: "var(--accent)" }}>📍</span>
-              <div style={{ flex: 1 }}><div style={{ font: "600 14px var(--font-sans)", color: "var(--text)" }}>{selected.name}</div><div style={{ font: "11px var(--font-mono)", color: "var(--text-secondary)" }}>{selected.address}</div></div>
-              <button className="btn-icon" style={{ flexShrink: 0, width: 24, height: 24, fontSize: 11 }} onClick={() => { setSelected(null); setQuery(""); }}>✕</button>
+            )}
+          </>)}
+
+          {stayType === "home" && (<>
+            <label className="field-label">Place Name</label>
+            <input className="field-input" placeholder="e.g. Mom's house, Sarah's apartment" value={homeName} onChange={(e) => setHomeName(e.target.value)} style={{ marginBottom: 14 }} autoFocus />
+            <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+              <div style={{ flex: 1 }}>
+                <label className="field-label">City</label>
+                <input className="field-input" placeholder="e.g. Austin" value={homeCity} onChange={(e) => setHomeCity(e.target.value)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="field-label">Country</label>
+                <input className="field-input" placeholder="e.g. USA" value={homeCountry} onChange={(e) => setHomeCountry(e.target.value)} />
+              </div>
             </div>
-          )}
+            <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", marginBottom: 14 }}>
+              We'll pin the city center on your map — no street address needed.
+            </div>
+          </>)}
 
           <label className="field-label">Dates</label>
           <DateRangePicker startDate={checkIn} endDate={checkOut} onChange={(s, e) => { setCI(s); setCO(e); }} />
@@ -162,7 +237,8 @@ export default function AddStayModal({ onClose, onAdd }) {
             </div>
           )}
 
-          {/* More details */}
+          {/* More details — hotel-only fields (room/view/loyalty don't apply to a friend's couch). */}
+          {stayType === "hotel" && (<>
           <button onClick={() => setSM(!showMore)} style={{ width: "100%", padding: "10px 14px", marginBottom: 14, background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text-secondary)", font: "500 13px var(--font-sans)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span>{showMore ? "Less" : "Room, view, booking details"}</span>
             <span style={{ fontSize: 11, transform: showMore ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }}>▼</span>
@@ -183,10 +259,11 @@ export default function AddStayModal({ onClose, onAdd }) {
               <input className="field-input" placeholder="e.g. Bonvoy #123456789" value={loyaltyNumber} onChange={(e) => setLN(e.target.value)} style={{ marginBottom: 14 }} />
             </div>
           )}
+          </>)}
 
           <label className="field-label">Notes</label>
           <textarea className="field-input" placeholder="Room tips, highlights…" rows={2} value={notes} onChange={(e) => setN(e.target.value)} style={{ resize: "vertical", marginBottom: 20 }} />
-          <button className="btn-submit" onClick={handleSubmit} disabled={!canAdd || submitting}>{submitting ? "Saving…" : canAdd ? `Log ${nights}-Night Stay` : "Search a hotel & set dates"}</button>
+          <button className="btn-submit" onClick={handleSubmit} disabled={!canAdd || submitting}>{submitting ? "Saving…" : canAdd ? `Log ${nights}-Night Stay` : stayType === "hotel" ? "Search a hotel & set dates" : "Add place name, city & dates"}</button>
         </div>
       </div>
     </div>

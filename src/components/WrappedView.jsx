@@ -16,14 +16,18 @@ const BRAND_PATTERNS = [
 function detectBrand(n) { if (!n) return "Independent"; for (const p of BRAND_PATTERNS) if (p.match.test(n)) return p.brand; return "Independent"; }
 
 function calcYearData(stays) {
-  const totalHotels = stays.length;
+  // "Hotels" tile counts only true hotels — friend/family-home stays are
+  // still part of cities, countries, and total nights, just not the
+  // hotel-brand stats.
+  const hotelStays = stays.filter((s) => s.stayType !== "home");
+  const totalHotels = hotelStays.length;
   const totalNights = stays.reduce((s, r) => s + (r.nights || 0), 0);
   const cities = [...new Set(stays.map((s) => s.city).filter(Boolean))];
   const countries = [...new Set(stays.map((s) => s.country).filter(Boolean))];
   const rated = stays.filter((s) => s.rating);
   const avgRating = rated.length ? rated.reduce((s, r) => s + r.rating, 0) / rated.length : 0;
   const topRated = stays.filter((s) => s.rating === 5).slice(0, 3);
-  const brands = {}; stays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + 1; });
+  const brands = {}; hotelStays.forEach((s) => { const b = detectBrand(s.hotel); brands[b] = (brands[b] || 0) + 1; });
   const topBrand = Object.entries(brands).sort(([, a], [, b]) => b - a)[0];
   const cityNights = {}; stays.forEach((s) => { if (s.city) cityNights[s.city] = (cityNights[s.city] || 0) + (s.nights || 0); });
   const topCity = Object.entries(cityNights).sort(([, a], [, b]) => b - a)[0];

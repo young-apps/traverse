@@ -82,7 +82,8 @@ export default function StatsView({ stays }) {
   const byYear = {}; past.forEach((s) => { if (!s.checkIn) return; const y = new Date(s.checkIn + "T00:00:00").getFullYear(); byYear[y] = (byYear[y] || 0) + (s.nights || 0); });
   const byCountry = {}; past.forEach((s) => { if (s.country) byCountry[s.country] = (byCountry[s.country] || 0) + (s.nights || 0); });
   const byCity = {}; past.forEach((s) => { if (s.city) byCity[s.city] = (byCity[s.city] || 0) + (s.nights || 0); });
-  const byBrand = {}; past.forEach((s) => { const b = detectBrand(s.hotel); byBrand[b] = (byBrand[b] || 0) + 1; });
+  // Brand detection is meaningless for "stayed at a friend's place" entries.
+  const byBrand = {}; past.forEach((s) => { if (s.stayType === "home") return; const b = detectBrand(s.hotel); byBrand[b] = (byBrand[b] || 0) + 1; });
   const bySource = {}; stays.forEach((s) => { if (s.bookedVia) bySource[s.bookedVia] = (bySource[s.bookedVia] || 0) + 1; });
   const byRoom = {}; stays.forEach((s) => { if (s.roomType) byRoom[s.roomType] = (byRoom[s.roomType] || 0) + 1; });
   const byTrip = {}; stays.forEach((s) => { if (s.tripPurpose) byTrip[s.tripPurpose] = (byTrip[s.tripPurpose] || 0) + 1; });
