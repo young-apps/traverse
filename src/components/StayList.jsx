@@ -5,22 +5,34 @@ import StayCard from "./StayCard";
 export default function StayList({ stays, selectedId, onSelect, onDelete, onAdd, onEdit }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("date-desc");
+  // "smart" (default) -> upcoming ascending (soonest first) + past
+  // descending (most recent first). One global sort puts those in the
+  // wrong order for one of the two sections, so we sort each section
+  // independently below.
+  const [sortBy, setSortBy] = useState("smart");
 
   const filtered = useMemo(() => {
     let list = [...stays];
     if (filter === "upcoming") list = list.filter((s) => s.status === "upcoming");
     if (filter === "past") list = list.filter((s) => s.status === "past");
     if (search) { const q = search.toLowerCase(); list = list.filter((s) => s.hotel?.toLowerCase().includes(q) || s.city?.toLowerCase().includes(q) || s.country?.toLowerCase().includes(q)); }
-    if (sortBy === "date-desc") list.sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn));
-    if (sortBy === "date-asc") list.sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-    if (sortBy === "rating") list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    if (sortBy === "nights") list.sort((a, b) => (b.nights || 0) - (a.nights || 0));
     return list;
-  }, [stays, search, filter, sortBy]);
+  }, [stays, search, filter]);
 
-  const upcoming = filtered.filter((s) => s.status === "upcoming");
-  const past = filtered.filter((s) => s.status === "past");
+  const sortStays = (arr, kind /* "upcoming" | "past" */) => {
+    const a = [...arr];
+    if (sortBy === "rating") return a.sort((x, y) => (y.rating || 0) - (x.rating || 0));
+    if (sortBy === "nights") return a.sort((x, y) => (y.nights || 0) - (x.nights || 0));
+    if (sortBy === "date-asc") return a.sort((x, y) => new Date(x.checkIn) - new Date(y.checkIn));
+    if (sortBy === "date-desc") return a.sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
+    // smart: upcoming asc, past desc
+    return kind === "upcoming"
+      ? a.sort((x, y) => new Date(x.checkIn) - new Date(y.checkIn))
+      : a.sort((x, y) => new Date(y.checkIn) - new Date(x.checkIn));
+  };
+
+  const upcoming = sortStays(filtered.filter((s) => s.status === "upcoming"), "upcoming");
+  const past = sortStays(filtered.filter((s) => s.status === "past"), "past");
 
   return (
     <div className="stays-page">
@@ -40,6 +52,7 @@ export default function StayList({ stays, selectedId, onSelect, onDelete, onAdd,
           <button key={f.v} className={`filter-chip ${filter === f.v ? "active" : ""}`} onClick={() => setFilter(f.v)}>{f.l}</button>
         ))}
         <select className="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <option value="smart">Default</option>
           <option value="date-desc">Newest</option>
           <option value="date-asc">Oldest</option>
           <option value="rating">Rating</option>
@@ -55,12 +68,18 @@ export default function StayList({ stays, selectedId, onSelect, onDelete, onAdd,
         </div>
       )}
 
-      {(filter === "all" ? past : filtered.filter((s) => filter === "upcoming" ? s.status === "upcoming" : filter === "past" ? s.status === "past" : true)).length > 0 && (
-        <div className="stay-section">
-          {filter === "all" && past.length > 0 && <div className="stay-section-header past">Past · {past.length}</div>}
-          {(filter === "all" ? past : filtered).map((s) => <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />)}
-        </div>
-      )}
+      {(() => {
+        // When the user picks the Upcoming or Past chip we render only that
+        // already-sorted section; in "all" we render past below upcoming.
+        const list = filter === "upcoming" ? upcoming : filter === "past" ? past : past;
+        if (!list.length) return null;
+        return (
+          <div className="stay-section">
+            {filter === "all" && past.length > 0 && <div className="stay-section-header past">Past · {past.length}</div>}
+            {list.map((s) => <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />)}
+          </div>
+        );
+      })()}
 
       {filtered.length === 0 && <div className="empty-state">{stays.length === 0 ? "No stays yet" : "No stays match your search"}</div>}
     </div>

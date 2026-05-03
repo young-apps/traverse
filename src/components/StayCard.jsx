@@ -72,8 +72,10 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
 
           {stay.notes && <div className="detail-notes">{stay.notes}</div>}
 
-          <div className="detail-footer">
-            <span className="detail-coords">{stay.lat?.toFixed(4)}°, {stay.lng?.toFixed(4)}°</span>
+          {/* Lat/lng intentionally hidden — they're technical noise that
+              clutters the card. The address link above already opens
+              Google Maps for users who want to see it on a map. */}
+          <div className="detail-footer" style={{ justifyContent: "flex-end" }}>
             <div style={{ display: "flex", gap: 6 }}>
               {onEdit && <button className="btn-edit" onClick={(e) => { e.stopPropagation(); onEdit(stay); }}>Edit</button>}
               <button className="btn-danger" onClick={(e) => { e.stopPropagation(); onDelete(stay.id); }}>Remove</button>

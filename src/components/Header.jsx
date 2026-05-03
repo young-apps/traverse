@@ -24,7 +24,8 @@ export default function Header({ user, stays }) {
 
   const past = stays.filter((s) => s.status === "past");
   const nights = past.reduce((s, r) => s + (r.nights || 0), 0);
-  const cities = new Set(stays.map((s) => s.city).filter(Boolean)).size;
+  // Country-first summary: high-level travel scope. City count lives on
+  // the Insights tab to keep this header focused.
   const countries = new Set(stays.map((s) => s.country).filter(Boolean)).size;
 
   const handleDelete = async () => {
@@ -77,13 +78,11 @@ export default function Header({ user, stays }) {
           )}
         </div>
       </div>
-      {/* Compact inline stats — no wrapping */}
+      {/* Compact inline stats — countries first, then breadth/depth metrics. */}
       <div className="stats-inline">
-        <span><b>{stays.length}</b> stays</span>
-        <span className="stats-dot">·</span>
-        <span><b>{cities}</b> cities</span>
-        <span className="stats-dot">·</span>
         <span><b>{countries}</b> countries</span>
+        <span className="stats-dot">·</span>
+        <span><b>{stays.length}</b> stays</span>
         <span className="stats-dot">·</span>
         <span><b>{nights}</b> nights</span>
       </div>

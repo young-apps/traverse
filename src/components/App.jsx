@@ -57,8 +57,9 @@ function Dashboard({ user }) {
 
   useEffect(() => { if (stays.length) scheduleStayNotifications(stays); }, [stays]);
 
+  // Soonest upcoming first; most recent past first.
   const upcoming = stays.filter((s) => s.status === "upcoming").sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-  const past = stays.filter((s) => s.status === "past");
+  const past = stays.filter((s) => s.status === "past").sort((a, b) => new Date(b.checkIn) - new Date(a.checkIn));
 
   const handleAdd = (data) => {
     const today = new Date().toISOString().split("T")[0];
