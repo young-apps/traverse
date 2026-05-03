@@ -2,70 +2,212 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Privacy Policy — Traverse</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Traverse — Track every hotel stay</title>
+<meta name="description" content="Traverse is your hotel passport. Track every stay, build your travel story, and see where friends are going." />
+<meta name="theme-color" content="#FFFFFF" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="Traverse — Track every hotel stay" />
+<meta property="og:description" content="Your hotel passport. Track every stay, build your travel story, and see where friends are going." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://young-apps.github.io/traverse/" />
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23FFFFFF' stroke='%23E2E8F0' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%234F46E5'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%234F46E5' stroke-width='1' opacity='0.4'/%3E%3C/svg%3E" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; color: #111; line-height: 1.55; }
-  h1 { font-size: 28px; margin-bottom: 8px; }
-  h2 { font-size: 18px; margin-top: 32px; }
-  p, li { font-size: 15px; }
-  .updated { color: #666; font-size: 13px; margin-bottom: 24px; }
-  a { color: #0a66c2; }
-  ul { padding-left: 20px; }
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F8FAFC;
+    --border: #E2E8F0;
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --text-dim: #94A3B8;
+    --accent: #4F46E5;
+    --accent-soft: #EEF2FF;
+    --green: #10B981;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); color: var(--text); background: var(--bg); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero { padding: 72px 0 48px; text-align: center; }
+  .logo {
+    width: 56px; height: 56px; margin: 0 auto 20px;
+    border-radius: 14px; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); position: relative;
+  }
+  .logo-dot::after {
+    content: ""; position: absolute; inset: -8px;
+    border: 1.5px solid var(--accent); border-radius: 50%; opacity: 0.4;
+  }
+  .brand { font: 700 20px var(--font-sans); letter-spacing: -0.02em; margin-bottom: 6px; }
+  h1 { font: 700 40px/1.15 var(--font-sans); letter-spacing: -0.03em; margin: 14px 0 14px; }
+  .tagline { font-size: 17px; color: var(--text-secondary); max-width: 480px; margin: 0 auto 32px; }
+
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 22px; border-radius: 12px;
+    font: 600 15px var(--font-sans); cursor: pointer;
+    transition: transform .08s, box-shadow .15s;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,0.25); }
+  .btn-primary:hover { box-shadow: 0 6px 20px rgba(79,70,229,0.35); }
+  .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+
+  .soon {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 18px;
+    padding: 6px 12px; border-radius: 999px; background: var(--surface);
+    border: 1px solid var(--border); font: 500 12px var(--font-mono); color: var(--text-secondary);
+  }
+  .soon-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  /* Features */
+  .features { padding: 32px 0 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .feature {
+    padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+  }
+  .feature h3 { margin: 0 0 6px; font: 600 15px var(--font-sans); }
+  .feature p { margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+
+  /* Privacy */
+  .privacy { padding: 48px 0 80px; border-top: 1px solid var(--border); margin-top: 24px; }
+  .privacy h2 { font: 600 22px var(--font-sans); letter-spacing: -0.01em; margin: 28px 0 8px; }
+  .privacy h2:first-of-type { margin-top: 0; }
+  .privacy p, .privacy li { font-size: 15px; color: var(--text-secondary); }
+  .privacy .updated { font: 500 12px var(--font-mono); color: var(--text-dim); margin-bottom: 24px; }
+  .privacy ul { padding-left: 20px; }
+  .privacy strong { color: var(--text); font-weight: 600; }
+
+  footer { padding: 32px 0 64px; text-align: center; font: 500 12px var(--font-mono); color: var(--text-dim); }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 32px; }
+    .hero { padding: 48px 0 32px; }
+  }
 </style>
 </head>
 <body>
 
-<h1>Privacy Policy</h1>
-<p class="updated">Last updated: April 27, 2026</p>
+<div class="wrap">
 
-<p>This Privacy Policy explains how the Traverse app ("Traverse," "we," "us") collects, uses, and protects your information when you use our app.</p>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="logo"><div class="logo-dot"></div></div>
+    <div class="brand">Traverse</div>
+    <h1>Your hotel passport.</h1>
+    <p class="tagline">Track every stay. Build your travel story. See where friends are going.</p>
 
-<h2>Information we collect</h2>
-<ul>
-  <li><strong>Account information:</strong> When you sign in with Apple or Google, we receive your name and email address from your authentication provider.</li>
-  <li><strong>Hotel stay data you enter:</strong> Hotel names, locations, check-in / check-out dates, room types, booking sources, and any notes you add about your stays.</li>
-  <li><strong>Friends and social data:</strong> Friend connections you create within the app and stay information your friends choose to share with you.</li>
-  <li><strong>Location data:</strong> Hotel locations you enter (typed addresses or selected places). We do not collect or track your real-time device location.</li>
-</ul>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://traverse-stays.vercel.app/">
+        Open the app →
+      </a>
+      <a class="btn btn-ghost" href="#privacy">Privacy &amp; terms</a>
+    </div>
 
-<h2>How we use your information</h2>
-<ul>
-  <li>To provide the core features of the app — saving your stays, displaying them on a map, calculating travel statistics.</li>
-  <li>To enable social features such as friend lists and shared travel feeds.</li>
-  <li>To authenticate you securely on each visit.</li>
-</ul>
+    <div class="soon">
+      <span class="soon-dot"></span>
+      iOS App Store coming soon
+    </div>
+  </section>
 
-<h2>How your data is stored</h2>
-<p>Your data is stored in Google Firebase (Firestore + Firebase Authentication). Communication between the app and Firebase is encrypted in transit using HTTPS / TLS. Firebase's data security practices are described at <a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>.</p>
+  <!-- Features -->
+  <section class="features">
+    <div class="feature">
+      <h3>🌍 Map every stay</h3>
+      <p>Every hotel pinned on a clean world map. Zoom into a city, replay a year, see the shape of your travel.</p>
+    </div>
+    <div class="feature">
+      <h3>📊 Personal insights</h3>
+      <p>Cities, countries, brands, spend per night, top-rated stays — your year in travel without the spreadsheet.</p>
+    </div>
+    <div class="feature">
+      <h3>👥 Friends, privately</h3>
+      <p>Compare nights and trips with travel-circle leaderboards. Stay-sharing is opt-in; spend stays private.</p>
+    </div>
+    <div class="feature">
+      <h3>💱 Any currency</h3>
+      <p>Log a London stay in pounds, a Tokyo stay in yen. We convert at booking time so totals always line up.</p>
+    </div>
+  </section>
 
-<h2>Third-party services</h2>
-<ul>
-  <li><strong>Google Firebase</strong> — authentication and database.</li>
-  <li><strong>Mapbox</strong> — map tiles and rendering.</li>
-  <li><strong>Google Places API</strong> — hotel and address search.</li>
-  <li><strong>Apple Sign In</strong> — optional sign-in method.</li>
-</ul>
-<p>These providers may receive minimal technical data (IP address, device type) necessary to deliver their service.</p>
+  <!-- Privacy / Terms -->
+  <section class="privacy" id="privacy">
+    <h2>Privacy Policy &amp; Terms</h2>
+    <p class="updated">Last updated: May 3, 2026</p>
 
-<h2>Data sharing</h2>
-<p>We do not sell your data. We do not share your data with advertisers. The only data shared with other users of the app is information you explicitly choose to share via the friends feature.</p>
+    <p>This page explains how the Traverse app ("Traverse," "we," "us") collects, uses, and protects your information when you use the app via web or iOS.</p>
 
-<h2>Your rights</h2>
-<ul>
-  <li><strong>Access:</strong> You can view all the data the app stores for you directly in the app.</li>
-  <li><strong>Edit:</strong> You can edit or delete individual stays at any time.</li>
-  <li><strong>Delete your account:</strong> Open the app menu (your avatar in the top right) → <em>Delete account</em>. This permanently removes all your stays, friends, and account data. This action cannot be undone.</li>
-</ul>
+    <h2>Information we collect</h2>
+    <ul>
+      <li><strong>Account information:</strong> When you sign in with Apple or Google, we receive your name and email address from your authentication provider.</li>
+      <li><strong>Hotel stay data you enter:</strong> Hotel names, locations, check-in / check-out dates, room types, booking sources, costs (in your chosen currency), and any notes you add about your stays.</li>
+      <li><strong>Friends and social data:</strong> Friend connections you create within the app and stay information your friends explicitly opt in to share with you.</li>
+      <li><strong>Location data:</strong> Hotel locations you enter (typed addresses or selected places). We do not collect or track your real-time device location.</li>
+    </ul>
 
-<h2>Children</h2>
-<p>Traverse is not directed to children under 13 and we do not knowingly collect data from them.</p>
+    <h2>How we use your information</h2>
+    <ul>
+      <li>To provide the core features of the app — saving your stays, displaying them on a map, calculating travel statistics.</li>
+      <li>To enable social features such as friend lists and shared travel feeds.</li>
+      <li>To authenticate you securely on each visit.</li>
+    </ul>
 
-<h2>Changes to this policy</h2>
-<p>If we make material changes to this policy we will update the "Last updated" date above and, where appropriate, notify you in the app.</p>
+    <h2>How your data is stored</h2>
+    <p>Your data is stored in Google Firebase (Firestore + Firebase Authentication). Communication between the app and Firebase is encrypted in transit using HTTPS / TLS. Firebase&rsquo;s data security practices are described at <a href="https://firebase.google.com/support/privacy">firebase.google.com/support/privacy</a>.</p>
 
-<h2>Contact</h2>
-<p>Questions about this policy? Email <a href="mailto:mattyoung25@yahoo.com">mattyoung25@yahoo.com</a>.</p>
+    <h2>Third-party services</h2>
+    <ul>
+      <li><strong>Google Firebase</strong> &mdash; authentication and database.</li>
+      <li><strong>Mapbox</strong> &mdash; map tiles and rendering.</li>
+      <li><strong>Google Places API</strong> &mdash; hotel and address search.</li>
+      <li><strong>Frankfurter</strong> &mdash; daily foreign-exchange reference rates from the European Central Bank, for currency conversion.</li>
+      <li><strong>Apple Sign In</strong> &mdash; optional sign-in method.</li>
+    </ul>
+    <p>These providers may receive minimal technical data (IP address, device type) necessary to deliver their service.</p>
+
+    <h2>Data sharing</h2>
+    <p>We do not sell your data. We do not share your data with advertisers. The only data shared with other users of the app is information you explicitly choose to share via the friends feature, and stay-sharing is off by default.</p>
+
+    <h2>Your rights</h2>
+    <ul>
+      <li><strong>Access:</strong> You can view all the data the app stores for you directly in the app.</li>
+      <li><strong>Edit:</strong> You can edit or delete individual stays at any time.</li>
+      <li><strong>Delete your account:</strong> Open the app menu (your avatar in the top right) &rarr; <em>Delete account</em>. This permanently removes all your stays, friends, and account data. This action cannot be undone.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>Traverse is not directed to children under 13 and we do not knowingly collect data from them.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If we make material changes to this policy we will update the &ldquo;Last updated&rdquo; date above and, where appropriate, notify you in the app.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy? Email <a href="mailto:mattyoung25@yahoo.com">mattyoung25@yahoo.com</a>.</p>
+  </section>
+
+  <footer>
+    &copy; 2026 Traverse &middot; <a href="https://traverse-stays.vercel.app/">Open the app</a>
+  </footer>
+
+</div>
 
 </body>
 </html>
