@@ -1,6 +1,6 @@
 // FriendsView — with privacy disclaimer + opt-in stay-sharing toggle
-import { useState, useEffect, useRef } from "react";
-import { findUserByEmail, findUsersByName, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
+import { useState, useEffect } from "react";
+import { searchUsers, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, getUserProfile, setShareStaysWithFriends } from "../services/friends";
 import { TERMS_URL } from "../services/links";
 
 const fmt = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
@@ -16,7 +16,6 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
   // Sharing is OFF by default — users explicitly opt in to expose their stays.
   const [sharing, setSharing] = useState(false);
   const [savingShare, setSavingShare] = useState(false);
-  const searchDebounce = useRef(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -36,36 +35,31 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
     setSavingShare(false);
   };
 
-  // Debounced search — email lookup if it looks like an email, otherwise
-  // name-prefix lookup. Shows up to 8 candidates the user can pick from.
+  // Fuzzy search across displayName + email. The directory is fetched
+  // once and cached in memory by services/friends.js, so each keystroke
+  // is a near-instant in-memory filter -- no debounce needed, no extra
+  // Firestore reads per keystroke.
   useEffect(() => {
-    clearTimeout(searchDebounce.current);
     setError(null); setSuccess(null);
     const q = searchQuery.trim();
-    if (q.length < 2) { setSearchResults([]); return; }
-    searchDebounce.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        if (q.includes("@")) {
-          const found = await findUserByEmail(q);
-          setSearchResults(found ? [found] : []);
-          if (!found) setError("No Traverse account with that email.");
-        } else {
-          const list = await findUsersByName(q);
-          // Filter out self + existing friends from the visible list.
-          const filtered = list.filter((p) => p.uid !== user.uid && !friends.some((f) => f.friendUid === p.uid));
-          setSearchResults(filtered);
-          if (!filtered.length) setError("No matches.");
-        }
-      } catch (e) {
-        console.error("search error", e);
-        if (e.code === "permission-denied") setError("Permission denied. Firestore rules need updating.");
-        else setError(`Search failed: ${e.message || "unknown"}`);
-        setSearchResults([]);
-      }
+    if (q.length < 1) { setSearchResults([]); return; }
+    let cancelled = false;
+    setSearching(true);
+    searchUsers(q).then((list) => {
+      if (cancelled) return;
+      const filtered = list.filter((p) => p.uid !== user.uid && !friends.some((f) => f.friendUid === p.uid));
+      setSearchResults(filtered);
+      if (!filtered.length) setError("No matches.");
       setSearching(false);
-    }, 350);
-    return () => clearTimeout(searchDebounce.current);
+    }).catch((e) => {
+      if (cancelled) return;
+      console.error("search error", e);
+      if (e.code === "permission-denied") setError("Permission denied. Firestore rules need updating.");
+      else setError(`Search failed: ${e.message || "unknown"}`);
+      setSearchResults([]);
+      setSearching(false);
+    });
+    return () => { cancelled = true; };
   }, [searchQuery, user.uid, friends]);
 
   const handleSendRequestTo = async (profile) => {
@@ -186,7 +180,7 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
           }}>Invite via link</button>
         </div>
         <input style={{ width: "100%", padding: "10px 14px", background: "var(--bg-2)", border: "1px solid var(--border)", borderRadius: 10, color: "var(--text)", font: "13px var(--font-sans)", outline: "none", boxSizing: "border-box" }}
-          placeholder="Search by name or email…" value={searchQuery}
+          placeholder="Search any name or email…" value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)} />
 
         {/* Candidate list — appears as you type */}

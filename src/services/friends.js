@@ -55,20 +55,59 @@ export async function findUserByEmail(email) {
   return snapshot.docs[0].data();
 }
 
+// In-memory directory cache. Pulled once per session and re-used for
+// every keystroke in the friend search box. At our scale (single-digit
+// to low-hundred users) the full collectionGroup read is cheaper than
+// running a fresh prefix query per keystroke and gives us true fuzzy
+// substring matching across displayName, displayNameLower, and email
+// without needing any composite indexes.
+//
+// If/when the directory crosses a few thousand profiles, swap this for
+// Algolia / Typesense / a tokenized array-contains-any approach.
+let _directoryCache = null;
+let _directoryFetchedAt = 0;
+const DIRECTORY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function loadDirectory() {
+  if (_directoryCache && Date.now() - _directoryFetchedAt < DIRECTORY_TTL_MS) {
+    return _directoryCache;
+  }
+  const snap = await getDocs(collectionGroup(db, "profile"));
+  _directoryCache = snap.docs.map((d) => d.data()).filter((p) => p && p.uid);
+  _directoryFetchedAt = Date.now();
+  return _directoryCache;
+}
+
+/** Force a refresh on the next searchUsers() call (e.g. after sign-in). */
+export function invalidateDirectoryCache() {
+  _directoryCache = null;
+}
+
 /**
- * Case-insensitive prefix search by display name. Returns up to 8
- * profiles. Requires Firestore rule allowing collectionGroup reads
- * on `profile` where the query filter is on displayNameLower (the
- * same rule shape that already works for findUserByEmail).
+ * Fuzzy search across displayName, displayNameLower, and email.
+ * Case-insensitive substring match. Returns up to 12 results, ranked
+ * by where the match occurred (name prefix > name contains > email
+ * prefix > email contains). Works whether or not displayNameLower
+ * has been backfilled on a given profile -- falls back to displayName.
  */
-export async function findUsersByName(nameQuery) {
-  const q = nameQuery.trim().toLowerCase();
-  if (q.length < 2) return [];
-  const ref = collectionGroup(db, "profile");
-  const snap = await getDocs(
-    query(ref, where("displayNameLower", ">=", q), where("displayNameLower", "<=", q + "\uf8ff"))
-  );
-  return snap.docs.map((d) => d.data()).slice(0, 8);
+export async function searchUsers(rawQuery) {
+  const q = (rawQuery || "").trim().toLowerCase();
+  if (q.length < 1) return [];
+  const profiles = await loadDirectory();
+
+  const scored = [];
+  for (const p of profiles) {
+    const name = (p.displayNameLower || p.displayName || "").toLowerCase();
+    const email = (p.email || "").toLowerCase();
+    let score = 0;
+    if (name.startsWith(q)) score = 4;
+    else if (name.includes(q)) score = 3;
+    else if (email.startsWith(q)) score = 2;
+    else if (email.includes(q)) score = 1;
+    if (score > 0) scored.push({ profile: p, score });
+  }
+  scored.sort((a, b) => b.score - a.score || (a.profile.displayName || "").localeCompare(b.profile.displayName || ""));
+  return scored.slice(0, 12).map((s) => s.profile);
 }
 
 // ── Friend Requests ──

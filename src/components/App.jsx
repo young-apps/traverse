@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useStays } from "../hooks/useStays";
 import { useFriends } from "../hooks/useFriends";
 import { addStay, deleteStay, updateStay } from "../services/stays";
-import { saveUserProfile } from "../services/friends";
+import { saveUserProfile, invalidateDirectoryCache } from "../services/friends";
 import { cacheHotelPhoto } from "../services/photos";
 import { requestNotificationPermission, scheduleStayNotifications } from "../services/notifications";
 import Auth from "./Auth";
@@ -27,7 +27,14 @@ import CalendarView from "./CalendarView";
 
 export default function App() {
   const { user, loading } = useAuth();
-  useEffect(() => { if (user) { saveUserProfile(user).catch(console.error); requestNotificationPermission(); } }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    // Save profile (writes displayNameLower for legacy accounts), then
+    // bust the in-memory directory cache so the next friend search sees
+    // the freshly-backfilled fields instead of a stale snapshot.
+    saveUserProfile(user).then(invalidateDirectoryCache).catch(console.error);
+    requestNotificationPermission();
+  }, [user]);
   if (loading) return (
     <div className="auth-screen">
       <div className="auth-logo"><div className="auth-logo-dot" /></div>
