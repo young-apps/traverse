@@ -15,9 +15,30 @@
 
 import { Capacitor } from "@capacitor/core";
 
-const PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY;
+// A single GCP API key can only have ONE application restriction
+// (HTTP referrers OR iOS apps, not both), so we ship two keys and
+// pick by surface at runtime. Each key falls back to the legacy
+// VITE_GOOGLE_PLACES_KEY so a half-configured env still boots:
+//  - Native (Capacitor / TestFlight): iOS-restricted key
+//  - Browser (Vercel / local dev):    HTTP-referrer-restricted key
+// If only the legacy key is set, both surfaces use it (works fine
+// as long as the key has the right restriction for the surface
+// you're testing).
+const LEGACY_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY;
+const IOS_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY_IOS || LEGACY_KEY;
+const WEB_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY_WEB || LEGACY_KEY;
+const PLACES_KEY = Capacitor.isNativePlatform() ? IOS_KEY : WEB_KEY;
 const ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
 const IOS_BUNDLE_ID = "com.youngapps.traverse";
+
+// Surface which key surface is active so the in-app diag panel can
+// show it. Helps diagnose "why does search work in browser but not
+// on device" without needing Web Inspector.
+console.log(
+  "[places] surface=%s key=%s",
+  Capacitor.isNativePlatform() ? "ios" : "web",
+  PLACES_KEY ? `${PLACES_KEY.slice(0, 6)}…` : "(none)"
+);
 
 /**
  * Search hotels by free-text query.
