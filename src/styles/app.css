@@ -204,6 +204,45 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .rating-btn.filled { transform: scale(1.15); }
 .btn-submit { width: 100%; padding: 14px; border-radius: 12px; border: none; font: 700 15px var(--font-sans); cursor: pointer; background: var(--accent); color: #FFFFFF; box-shadow: 0 2px 8px rgba(79,70,229,.20); }
 .btn-submit:disabled { background: var(--surface-hover); color: var(--text-dim); cursor: not-allowed; box-shadow: none; }
+.btn-secondary { width: 100%; padding: 13px; border-radius: 12px; border: 1px solid var(--border); font: 600 14px var(--font-sans); cursor: pointer; background: transparent; color: var(--text-secondary); }
+.btn-secondary:disabled { color: var(--text-dim); cursor: not-allowed; }
+
+/* ─── Stepped wizard ────────────────────────────────────────────── */
+.wizard-head { padding: 14px 18px; }
+.wizard-progress { display: flex; gap: 6px; align-items: center; }
+.wizard-dot { width: 28px; height: 4px; border-radius: 2px; background: var(--border); transition: background .2s; }
+.wizard-dot.active { background: var(--accent); }
+.wizard-dot.done { background: var(--accent-border); }
+
+/* Each step body slides in from the right; key={step} on the wrapper
+   re-mounts so the animation re-fires per step change. */
+.wizard-body { padding: 18px 22px 12px; min-height: 360px; animation: wizardSlide .25s ease; }
+@keyframes wizardSlide { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+.wizard-step { display: flex; flex-direction: column; }
+.wizard-prompt { font: 600 20px/1.25 var(--font-display); color: var(--text); margin-bottom: 14px; letter-spacing: -.01em; }
+
+/* Trip-type tiles — large, high-contrast, one-tap. */
+.wizard-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wizard-tile { padding: 22px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text-secondary); font: 600 15px var(--font-sans); cursor: pointer; text-align: left; transition: all .15s; }
+.wizard-tile:hover { border-color: var(--border-hover); }
+.wizard-tile.active { background: var(--accent-muted); border-color: var(--accent-border); color: var(--accent); }
+
+/* Larger input — used for the primary search/place-name on Step 1. */
+.field-input-lg { padding: 14px 14px; font: 500 16px var(--font-sans); }
+
+/* Cost display + numeric keypad (Step 3). */
+.cost-display { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 14px; background: var(--bg-2); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; }
+.cost-currency { background: transparent; border: none; font: 600 14px var(--font-mono); color: var(--text-secondary); appearance: auto; cursor: pointer; }
+.cost-amount { flex: 1; text-align: center; font: 700 36px var(--font-display); color: var(--text); letter-spacing: -.02em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cost-clear { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 28px; height: 28px; color: var(--text-dim); cursor: pointer; font-size: 11px; }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+.keypad-key { padding: 16px 0; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text); font: 600 22px var(--font-display); cursor: pointer; transition: background .1s; }
+.keypad-key:active { background: var(--surface-active); }
+.keypad-back { font-size: 18px; color: var(--text-secondary); }
+
+/* Footer — sticky pair of buttons (Skip & Save / Continue or Done). */
+.wizard-footer { padding: 12px 22px 22px; border-top: 1px solid var(--border); background: var(--surface); position: sticky; bottom: 0; display: flex; flex-direction: column; gap: 8px; }
 .search-status { padding: 10px 0; font: 12px var(--font-mono); color: var(--accent); display: flex; align-items: center; gap: 6px; }
 .search-status.empty { color: var(--text-dim); }
 .spin { animation: spin 1s linear infinite; display: inline-block; }
