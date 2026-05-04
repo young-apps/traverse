@@ -28,18 +28,35 @@ export default function Header({ user, stays }) {
   // the Insights tab to keep this header focused.
   const countries = new Set(stays.map((s) => s.country).filter(Boolean)).size;
 
+  // Apple Guideline 5.1.1(v): in-app delete must actually erase the
+  // account and ALL associated data. Two-step confirmation makes the
+  // permanence explicit — the first prompt explains scope, the second
+  // requires the user to retype "DELETE" so a misclick can't trigger it.
   const handleDelete = async () => {
-    const confirmed = window.confirm(
-      "Delete your account?\n\nThis will permanently erase all your stays, friends, and account data. This cannot be undone."
+    const ok = window.confirm(
+      "Delete your account?\n\n" +
+      "This permanently removes:\n" +
+      "  • Your profile and sign-in\n" +
+      "  • Every stay you've logged\n" +
+      "  • Friend connections (and your entry from your friends' lists)\n" +
+      "  • Pending friend requests\n" +
+      "  • Photos you uploaded\n\n" +
+      "This cannot be undone."
     );
-    if (!confirmed) return;
+    if (!ok) return;
+    const typed = window.prompt('Type DELETE to confirm:');
+    if (typed?.trim().toUpperCase() !== "DELETE") return;
+
     setDeleting(true);
     try {
       await deleteAccount();
-      // After delete, Firebase auto-signs out; the app will return to the auth screen.
+      // Firebase auto-signs out after deleteUser; the app returns to auth.
     } catch (e) {
       console.error("Account deletion failed:", e);
-      alert("Couldn't delete your account: " + (e.message || "unknown error") + "\n\nPlease try again or contact support.");
+      const msg = e?.code === "auth/requires-recent-login"
+        ? "For your security, please sign in again and then retry deletion."
+        : (e.message || "Unknown error");
+      alert("Couldn't delete your account:\n\n" + msg);
       setDeleting(false);
     }
   };
