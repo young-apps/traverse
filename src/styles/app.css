@@ -296,36 +296,66 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
   100% { transform: scale(4); opacity: 0; }
 }
 
-/* ─── Phase 3: Full-bleed map home with swipe-up sheet ─────────── */
-.map-home {
-  position: relative;
-  height: calc(100dvh - 56px - 60px); /* viewport minus header minus bottom nav */
+/* ─── Map home: split pane (map on top, list below) ───────────────
+   Replaces the swipe-up sheet pattern. Map is always visible as the
+   visual anchor; list always scannable below. A toggle button in the
+   map's top-right cycles default → map-max → list-max → default so the
+   user can rebalance without losing either pane. */
+.map-home-split {
+  display: flex; flex-direction: column;
+  height: calc(100dvh - 56px - 60px); /* viewport - header - bottom nav */
   overflow: hidden;
 }
-.map-home-map { position: absolute; inset: 0; }
-.map-home-map .map-section { height: 100%; }
-.map-home-map .map-container { height: 100%; }
-.map-sheet {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  background: var(--surface, #fff);
-  border-top-left-radius: 20px; border-top-right-radius: 20px;
-  box-shadow: 0 -8px 30px rgba(15,23,42,0.18);
+.map-home-pane {
+  flex-grow: 0; flex-shrink: 0;
+  position: relative; min-height: 0;
+  transition: flex-basis 0.32s cubic-bezier(.22,1,.36,1);
+}
+.map-home-pane.map-pane { background: var(--surface, #fff); }
+.map-home-pane.map-pane .map-section { height: 100%; position: absolute; inset: 0; }
+.map-home-pane.map-pane .map-container { height: 100%; }
+.map-home-pane.list-pane {
   display: flex; flex-direction: column;
-  touch-action: none;
-  transition: height 0.28s cubic-bezier(.22,1,.36,1);
-  z-index: 5;
+  border-top: 1px solid var(--border);
+  background: var(--surface, #fff);
+  box-shadow: 0 -4px 16px rgba(15,23,42,0.06);
 }
-.map-sheet.dragging { transition: none; }
-.map-sheet.snap-full { touch-action: pan-y; }
-.sheet-handle { display: flex; justify-content: center; padding: 8px 0 4px; }
-.sheet-handle span { width: 40px; height: 5px; border-radius: 99px; background: rgba(15,23,42,0.18); }
-.sheet-head {
+.split-list-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 16px 10px; gap: 12px;
-  border-bottom: 1px solid var(--border, rgba(15,23,42,0.06));
+  padding: 10px 16px; gap: 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.92);
 }
-.sheet-title { font-size: 14px; font-weight: 600; color: var(--text); }
-.sheet-body { flex: 1; -webkit-overflow-scrolling: touch; }
+.split-list-title { font: 600 13px var(--font-sans); color: var(--text); }
+.split-list-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* Map-mode toggle button — same visual language as .map-reset-btn. */
+.map-mode-btn {
+  position: absolute; top: 12px; right: 56px; z-index: 6;
+  width: 36px; height: 36px; padding: 0;
+  border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(255,255,255,.95); backdrop-filter: blur(10px);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15,23,42,.08);
+  transition: transform .15s, color .15s;
+}
+.map-mode-btn:hover { color: var(--accent); transform: scale(1.05); }
+.map-mode-btn:active { transform: scale(0.95); }
+
+/* The map's bottom-floating legend has to live INSIDE the map pane —
+   on the home split layout, viewport-bottom positioning would push it
+   onto the list. Override .map-legend's position so it pins to the
+   bottom of the .map-pane container. */
+.map-pane .map-legend {
+  position: absolute; left: 12px; bottom: 12px; right: auto; z-index: 5;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 6px 10px; gap: 10px;
+  font: 600 10px var(--font-mono); color: var(--text-secondary);
+  display: flex; align-items: center;
+}
 
 /* ─── Card density + status colors (Phase post-feedback) ──────────
    - Past = gray accent (slate left rail, dim text)
@@ -368,22 +398,42 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .stay-section-header { z-index: 4; }
 
 /* ─── Friends Map ─────────────────────────────────────────────── */
-.friends-map-wrap { position: relative; height: calc(100dvh - 56px - 60px - 56px); margin: 0 0 16px; }
+.friends-map-split {
+  display: flex; flex-direction: column;
+  /* Subtract: header (~56) + bottom nav (60) + explore tabs (~52). */
+  height: calc(100dvh - 56px - 60px - 52px);
+  overflow: hidden;
+}
+.friends-map-split .map-pane { flex-basis: 56%; }
+.friends-map-split .list-pane { flex-basis: 44%; }
 .friends-map { position: absolute; inset: 0; }
 .friends-map-legend {
-  position: absolute; left: 16px; bottom: 16px; z-index: 5;
-  display: flex; gap: 12px; padding: 8px 12px;
+  position: absolute; left: 12px; bottom: 12px; z-index: 5;
+  display: flex; gap: 10px; padding: 6px 10px;
   background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
   border: 1px solid var(--border); border-radius: 10px;
-  font: 600 11px var(--font-mono); color: var(--text-secondary);
+  font: 600 10px var(--font-mono); color: var(--text-secondary);
 }
-.friends-map-count { color: var(--text-dim); border-left: 1px solid var(--border); padding-left: 12px; }
-.friends-map-empty {
-  position: absolute; inset: 0; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 8px;
-  background: rgba(255,255,255,.85); backdrop-filter: blur(2px);
-  pointer-events: none;
+.friends-map-count { color: var(--text-dim); border-left: 1px solid var(--border); padding-left: 10px; }
+
+/* City rows in the friends-map list pane. Tappable, with a colored dot
+   that mirrors the map marker (green = upcoming, slate = past-only). */
+.friend-city-list { padding: 4px 0 16px; }
+.friend-city-row {
+  width: 100%; display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; background: none; border: none;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  text-align: left; transition: background .12s;
 }
+.friend-city-row:hover { background: var(--surface-hover); }
+.friend-city-dot { flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; }
+.friend-city-dot.up { background: #3DD68C; box-shadow: 0 0 6px #3DD68C80; }
+.friend-city-dot.past { background: #475569; }
+.friend-city-name { font: 600 14px var(--font-sans); color: var(--text); }
+.friend-city-meta { font: 11px var(--font-mono); color: var(--text-dim); margin-top: 2px; }
+.friend-city-up { color: var(--green); }
+.friend-city-friends { font: 12px var(--font-sans); color: var(--text-secondary); margin-top: 4px; }
+
 .fpop-row { padding: 6px 0; border-top: 1px solid var(--border); }
 .fpop-row.upcoming .fpop-friend { color: var(--green); }
 .fpop-friend { font: 600 12px var(--font-sans); color: var(--text); }

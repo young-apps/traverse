@@ -153,19 +153,37 @@ export default function FriendsMapView({ friends, friendStays }) {
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, []);
 
-  // Push features whenever friends or shared stays change.
+  // Push features whenever friends or shared stays change. Memoized so
+  // the list pane can iterate the same cities without recomputing.
+  const [features, setFeatures] = useState([]);
   useEffect(() => {
+    const f = buildCityFeatures(friends, friendStays);
+    setFeatures(f);
     if (!mapRef.current || !ready) return;
-    const features = buildCityFeatures(friends, friendStays);
     const src = mapRef.current.getSource(SOURCE);
-    if (src) src.setData({ type: "FeatureCollection", features });
-    // Auto-fit when we have something to show.
-    if (features.length) {
+    if (src) src.setData({ type: "FeatureCollection", features: f });
+    if (f.length) {
       const bounds = new mapboxgl.LngLatBounds();
-      features.forEach((f) => bounds.extend(f.geometry.coordinates));
+      f.forEach((feat) => bounds.extend(feat.geometry.coordinates));
       mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 4, duration: 600 });
     }
   }, [friends, friendStays, ready]);
+
+  const flyToCity = (feature) => {
+    if (!mapRef.current) return;
+    mapRef.current.flyTo({ center: feature.geometry.coordinates, zoom: 8, duration: 1000 });
+  };
+
+  const resetView = () => {
+    if (!mapRef.current) return;
+    if (features.length) {
+      const bounds = new mapboxgl.LngLatBounds();
+      features.forEach((f) => bounds.extend(f.geometry.coordinates));
+      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 4, duration: 800 });
+    } else {
+      mapRef.current.flyTo({ center: [10, 30], zoom: 1.5, duration: 800 });
+    }
+  };
 
   // Count helpers for the empty-state copy.
   const sharedFriends = friends.filter((f) => {
@@ -174,23 +192,92 @@ export default function FriendsMapView({ friends, friendStays }) {
     return shared && (Array.isArray(entry) ? entry.length : (entry?.stays?.length || 0)) > 0;
   });
 
+  // Sort cities for the list pane: any with upcoming visits first
+  // (soonest checkIn ascending), then past-only by most recent.
+  const cityRows = [...features].sort((a, b) => {
+    const aUp = a.properties.upcoming, bUp = b.properties.upcoming;
+    if ((aUp > 0) !== (bUp > 0)) return bUp - aUp;
+    const aVisits = JSON.parse(a.properties.visits);
+    const bVisits = JSON.parse(b.properties.visits);
+    const aSoonest = aVisits.filter((v) => v.status === "upcoming").map((v) => v.checkIn).sort()[0] || "";
+    const bSoonest = bVisits.filter((v) => v.status === "upcoming").map((v) => v.checkIn).sort()[0] || "";
+    if (aSoonest && bSoonest) return aSoonest.localeCompare(bSoonest);
+    if (aSoonest) return -1;
+    if (bSoonest) return 1;
+    const aLatest = aVisits.map((v) => v.checkIn).sort().slice(-1)[0] || "";
+    const bLatest = bVisits.map((v) => v.checkIn).sort().slice(-1)[0] || "";
+    return bLatest.localeCompare(aLatest);
+  });
+
   return (
-    <div className="friends-map-wrap">
-      <div ref={containerRef} className="friends-map" />
-      {error && <div className="map-loading">{error}</div>}
-      <div className="friends-map-legend">
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C" }} /> Upcoming</span>
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#475569" }} /> Past</span>
-        <span className="legend-item friends-map-count">{sharedFriends.length} sharing</span>
+    <div className="friends-map-split">
+      <div className="map-home-pane map-pane">
+        <div ref={containerRef} className="friends-map" />
+        {error && <div className="map-loading">{error}</div>}
+        <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
+          title="Zoom out to see all friends">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 010 20"/><path d="M12 2a15 15 0 000 20"/>
+          </svg>
+        </button>
+        <div className="map-legend friends-map-legend">
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C" }} /> Upcoming</span>
+          <span className="legend-item"><span className="legend-dot" style={{ background: "#475569" }} /> Past</span>
+          <span className="legend-item friends-map-count">{sharedFriends.length} sharing</span>
+        </div>
       </div>
-      {!error && sharedFriends.length === 0 && (
-        <div className="friends-map-empty">
-          <div style={{ font: "italic 14px var(--font-display)", color: "var(--text-dim)", marginBottom: 6 }}>No friends sharing yet</div>
-          <div style={{ font: "12px var(--font-sans)", color: "var(--text-dim)", maxWidth: 280, textAlign: "center" }}>
-            Friends only appear here once they turn on stay sharing in their own privacy settings.
+
+      <div className="map-home-pane list-pane">
+        <div className="split-list-head">
+          <div className="split-list-title">
+            {features.length > 0
+              ? `${features.length} ${features.length === 1 ? "city" : "cities"} · ${sharedFriends.length} sharing`
+              : "Friends Map"}
           </div>
         </div>
-      )}
+
+        <div className="split-list-body">
+          {features.length === 0 ? (
+            <div style={{ padding: "32px 20px", textAlign: "center" }}>
+              <div style={{ font: "italic 14px var(--font-display)", color: "var(--text-dim)", marginBottom: 6 }}>
+                {friends.length === 0 ? "No friends yet" : "Nothing to show yet"}
+              </div>
+              <div style={{ font: "12px/1.5 var(--font-sans)", color: "var(--text-dim)", maxWidth: 320, margin: "0 auto" }}>
+                {friends.length === 0
+                  ? "Add friends from the Friends tab — once they accept and turn on stay sharing, their cities will pin here."
+                  : "Your friends haven't turned on stay sharing yet. Each friend opts in from their own privacy settings."}
+              </div>
+            </div>
+          ) : (
+            <div className="friend-city-list">
+              {cityRows.map((feat) => {
+                const p = feat.properties;
+                const visits = JSON.parse(p.visits);
+                const upcomingVisits = visits.filter((v) => v.status === "upcoming");
+                return (
+                  <button key={`${p.country}-${p.city}`} className="friend-city-row"
+                    onClick={() => flyToCity(feat)}>
+                    <span className={`friend-city-dot ${p.upcoming > 0 ? "up" : "past"}`} />
+                    <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                      <div className="friend-city-name">{p.city}</div>
+                      <div className="friend-city-meta">
+                        {p.country} · {visits.length} {visits.length === 1 ? "visit" : "visits"}
+                        {upcomingVisits.length > 0 && (
+                          <span className="friend-city-up"> · {upcomingVisits.length} upcoming</span>
+                        )}
+                      </div>
+                      <div className="friend-city-friends">
+                        {[...new Set(visits.map((v) => v.friend))].slice(0, 3).join(", ")}
+                        {[...new Set(visits.map((v) => v.friend))].length > 3 && ` +${[...new Set(visits.map((v) => v.friend))].length - 3}`}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

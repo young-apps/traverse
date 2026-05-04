@@ -1,130 +1,72 @@
-// MapHome — full-bleed map with a draggable swipe-up sheet of stays.
+// MapHome — split-pane home: map on top, stays list below.
 //
-// Phase 3 of the Traverse rebuild. The map is the home page's center of
-// gravity; stay cards live in a sheet that the user can peek, half-open,
-// or pull all the way up to browse. Tapping a card selects + flies to
-// the pin on the map below.
+// The earlier swipe-up sheet hid the map whenever you wanted to read
+// the list and hid the list whenever you wanted to see the map. The new
+// rule: both visible, always. Map is the visual anchor (default ~58% of
+// available height), list scrolls beneath. A single "expand" toggle in
+// the map's top-right corner swaps modes:
 //
-// The sheet has three snap points expressed as a translateY in pixels
-// from the *bottom* of the home view:
-//   - peek:  shows just the handle + section title (~140px tall)
-//   - half:  ~55% of available height
-//   - full:  ~88% of available height (leaves the map peeking up top)
-// Pointer events drive a live translate while dragging; on release we
-// snap to whichever point is closest, with a velocity boost so a quick
-// flick goes one snap further.
+//   - default  → map ~58% / list ~42%
+//   - map-max  → map ~88% / list ~12% (just headers + first card)
+//   - list-max → map ~28% / list ~72% (skim a long history)
 //
-// We use pointer events (not touch) so the same code works in iOS
-// WebView, desktop Safari, and trackpad-emulation in dev. The sheet's
-// scroll content gets `overflow: auto` only when we're at the full
-// snap — otherwise dragging anywhere on the body moves the sheet.
+// Tapping a card calls `onSelect`, which the parent forwards to MapView
+// — which already has flyTo-on-select wired up. So clicking a stay
+// always pans the map underneath without the user losing the list.
 
-import { useEffect, useRef, useState, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import StayCard from "./StayCard";
 
 const MapView = lazy(() => import("./MapView"));
 
-const SNAPS = { peek: 0.18, half: 0.55, full: 0.88 }; // fraction of available height
+const MODES = {
+  "default": { map: 58, list: 42, icon: "expand" },
+  "map-max": { map: 88, list: 12, icon: "shrink" },
+  "list-max": { map: 28, list: 72, icon: "expand" },
+};
 
 export default function MapHome({
   stays, upcoming, past, selectedId, onSelect,
   onDelete, onEdit, onAdd, celebrate,
 }) {
-  const wrapRef = useRef(null);
-  const sheetRef = useRef(null);
-  const dragRef = useRef(null); // {startY, startHeight, lastY, lastT}
-  const [sheetH, setSheetH] = useState(0);   // current rendered height (px)
-  const [snap, setSnap] = useState("peek");  // which snap we're resting on
-  const [dragging, setDragging] = useState(false);
+  const [mode, setMode] = useState("default");
+  const dims = MODES[mode];
 
-  // Compute target height for a snap given the wrap's available height.
-  const targetFor = (s) => {
-    const wrap = wrapRef.current;
-    if (!wrap) return 0;
-    const avail = wrap.clientHeight;
-    return Math.round(avail * SNAPS[s]);
+  const cycleMode = () => {
+    setMode((m) => m === "default" ? "map-max" : m === "map-max" ? "list-max" : "default");
   };
 
-  // Resize on mount + window resize: snap to current label so the height
-  // tracks orientation changes.
-  useEffect(() => {
-    const recalc = () => setSheetH(targetFor(snap));
-    recalc();
-    window.addEventListener("resize", recalc);
-    return () => window.removeEventListener("resize", recalc);
-  }, [snap]);
-
-  // When a stay is selected from the map, drop the sheet to peek so the
-  // map stays visible. When the celebration fires, also collapse to peek
-  // so the new pin is visible behind the sheet.
-  useEffect(() => { if (celebrate) setSnap("peek"); }, [celebrate?.key]);
-
-  const onPointerDown = (e) => {
-    // Don't start a drag from interactive elements inside cards.
-    if (e.target.closest("button, a, input")) return;
-    const sheet = sheetRef.current;
-    if (!sheet) return;
-    // If we're at full snap and the body is scrolled, let the body scroll
-    // instead of dragging the sheet.
-    const body = sheet.querySelector(".sheet-body");
-    if (snap === "full" && body && body.scrollTop > 0 && !e.target.closest(".sheet-handle")) return;
-    sheet.setPointerCapture?.(e.pointerId);
-    dragRef.current = { startY: e.clientY, startH: sheetH, lastY: e.clientY, lastT: performance.now() };
-    setDragging(true);
+  // When a card is tapped, flip toward map-max so the user can see the
+  // pin they just selected. We don't go all the way — leave the list
+  // peeking so they can pick another stay without re-toggling.
+  const handleSelect = (id) => {
+    onSelect(id === selectedId ? null : id);
+    if (id !== selectedId && mode === "list-max") setMode("default");
   };
-  const onPointerMove = (e) => {
-    if (!dragRef.current) return;
-    const dy = e.clientY - dragRef.current.startY;
-    const next = clamp(dragRef.current.startH - dy, 60, wrapRef.current.clientHeight - 40);
-    setSheetH(next);
-    dragRef.current.lastY = e.clientY;
-    dragRef.current.lastT = performance.now();
-  };
-  const onPointerUp = () => {
-    if (!dragRef.current) return;
-    const startH = dragRef.current.startH;
-    const endH = sheetH;
-    const dt = Math.max(1, performance.now() - dragRef.current.lastT);
-    // Velocity (px/ms): negative = downward swipe, positive = upward
-    // because higher h = sheet pulled up.
-    const v = (endH - startH) / Math.max(dt, 16);
-    dragRef.current = null;
-    setDragging(false);
-    // Snap: pick nearest of {peek, half, full}; flick (|v|>0.5) bumps one
-    // notch in the swipe direction.
-    const order = ["peek", "half", "full"];
-    const heights = order.map(targetFor);
-    let nearest = 0;
-    let nd = Infinity;
-    heights.forEach((h, i) => { const d = Math.abs(h - endH); if (d < nd) { nd = d; nearest = i; } });
-    if (v > 0.6 && nearest < 2) nearest += 1;
-    if (v < -0.6 && nearest > 0) nearest -= 1;
-    setSnap(order[nearest]);
-    setSheetH(heights[nearest]);
-  };
-
-  const isFull = snap === "full";
 
   return (
-    <div className="map-home" ref={wrapRef}>
-      <div className="map-home-map">
+    <div className="map-home-split">
+      <div className="map-home-pane map-pane" style={{ flexBasis: `${dims.map}%` }}>
         <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
           <MapView stays={stays} selectedId={selectedId} onSelect={onSelect} celebrateAt={celebrate} />
         </Suspense>
+        <button className="map-mode-btn" onClick={cycleMode} aria-label="Toggle map size"
+          title={mode === "map-max" ? "Show more of the list" : mode === "list-max" ? "Show more of the map" : "Maximize map"}>
+          {mode === "map-max" ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H3v-6"/><path d="M21 3h-6"/><path d="M3 21l7-7"/><path d="M21 3l-7 7"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
+            </svg>
+          )}
+        </button>
       </div>
 
-      <div
-        ref={sheetRef}
-        className={`map-sheet ${dragging ? "dragging" : ""} snap-${snap}`}
-        style={{ height: sheetH }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
-        <div className="sheet-handle"><span /></div>
-        <div className="sheet-head">
-          <div className="sheet-title">
+      <div className="map-home-pane list-pane" style={{ flexBasis: `${dims.list}%` }}>
+        <div className="split-list-head">
+          <div className="split-list-title">
             {stays.length === 0 ? "No stays yet" :
               upcoming.length > 0 ? `${upcoming.length} upcoming · ${past.length} past`
               : `${past.length} stays`}
@@ -132,7 +74,7 @@ export default function MapHome({
           <button className="btn-primary btn-sm" onClick={onAdd}>+ Add</button>
         </div>
 
-        <div className="sheet-body" style={{ overflowY: isFull ? "auto" : "hidden" }}>
+        <div className="split-list-body">
           {stays.length === 0 ? (
             <div className="empty-hero" style={{ padding: 24 }}>
               <div className="empty-title">Track your hotel journey</div>
@@ -146,7 +88,7 @@ export default function MapHome({
                   <div className="section-title">Upcoming Stays</div>
                   {upcoming.map((s) => (
                     <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
-                      onSelect={(id) => onSelect(id === selectedId ? null : id)}
+                      onSelect={handleSelect}
                       onDelete={onDelete} onEdit={onEdit} />
                   ))}
                 </div>
@@ -156,7 +98,7 @@ export default function MapHome({
                   <div className="section-title" style={{ color: "var(--text-dim)" }}>Recent Stays</div>
                   {past.map((s) => (
                     <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
-                      onSelect={(id) => onSelect(id === selectedId ? null : id)}
+                      onSelect={handleSelect}
                       onDelete={onDelete} onEdit={onEdit} />
                   ))}
                 </div>
@@ -168,5 +110,3 @@ export default function MapHome({
     </div>
   );
 }
-
-function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
