@@ -36,11 +36,16 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
     setSavingShare(false);
   };
 
-  // Preload the full directory on mount so the user can see every signed-up
-  // account before they type a single character. Same single cached read
-  // that powers searchUsers(), so no extra Firestore traffic.
+  // Preload the full directory on mount AND every time the friends list
+  // mutates (add, accept, remove). Without re-fetching after a
+  // membership change the cached directory will keep showing a removed
+  // friend in the wrong bucket until the 5-minute TTL expires — that's
+  // the zombie-profile bug. We deliberately skip the cache here so the
+  // first render after a remove is canonical.
   useEffect(() => {
     let cancelled = false;
+    // Light-touch invalidation so listAllUsers re-reads from Firestore.
+    import("../services/friends").then((m) => m.invalidateDirectoryCache && m.invalidateDirectoryCache());
     listAllUsers()
       .then((list) => {
         if (cancelled) return;
@@ -48,7 +53,7 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
       })
       .catch((e) => console.warn("directory load failed", e));
     return () => { cancelled = true; };
-  }, [user.uid]);
+  }, [user.uid, friends.length]);
 
   // Fuzzy search across displayName + email. The directory is fetched
   // once and cached in memory by services/friends.js, so each keystroke

@@ -295,3 +295,74 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
   0%   { transform: scale(1); opacity: 0.6; }
   100% { transform: scale(4); opacity: 0; }
 }
+
+/* ─── Phase 3: Full-bleed map home with swipe-up sheet ─────────── */
+.map-home {
+  position: relative;
+  height: calc(100dvh - 56px - 60px); /* viewport minus header minus bottom nav */
+  overflow: hidden;
+}
+.map-home-map { position: absolute; inset: 0; }
+.map-home-map .map-section { height: 100%; }
+.map-home-map .map-container { height: 100%; }
+.map-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--surface, #fff);
+  border-top-left-radius: 20px; border-top-right-radius: 20px;
+  box-shadow: 0 -8px 30px rgba(15,23,42,0.18);
+  display: flex; flex-direction: column;
+  touch-action: none;
+  transition: height 0.28s cubic-bezier(.22,1,.36,1);
+  z-index: 5;
+}
+.map-sheet.dragging { transition: none; }
+.map-sheet.snap-full { touch-action: pan-y; }
+.sheet-handle { display: flex; justify-content: center; padding: 8px 0 4px; }
+.sheet-handle span { width: 40px; height: 5px; border-radius: 99px; background: rgba(15,23,42,0.18); }
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 16px 10px; gap: 12px;
+  border-bottom: 1px solid var(--border, rgba(15,23,42,0.06));
+}
+.sheet-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.sheet-body { flex: 1; -webkit-overflow-scrolling: touch; }
+
+/* ─── Card density + status colors (Phase post-feedback) ──────────
+   - Past = gray accent (slate left rail, dim text)
+   - Upcoming = purple accent (using --accent which is purple in tokens)
+   - Inline nights save a row of vertical space.                    */
+.stay-card { padding: 12px 20px; }
+.stay-card.upcoming { border-left-color: var(--accent); background: var(--accent-muted); }
+.stay-card.upcoming .stay-hotel { color: var(--text); }
+.stay-card.upcoming .stay-date-big { color: var(--accent); }
+.stay-card.past { opacity: 1; border-left-color: rgba(100,116,139,.45); background: var(--surface); }
+.stay-card.past .stay-hotel,
+.stay-card.past .stay-date-big,
+.stay-card.past .stay-location { color: var(--text-secondary); }
+.stay-card.past .stay-nights { color: var(--text-dim); }
+.stay-main { margin-bottom: 4px; }
+.stay-nights-inline { font: 600 12px var(--font-mono); color: var(--text-dim); margin-left: 2px; }
+
+/* Sticky per-section headers inside the list — Flighty-style.
+   Replaces the floating .scroll-ctx bar. The wrapper around each
+   section's cards becomes the scroll container's pinned region. */
+.stay-section-header {
+  position: sticky; top: 0; z-index: 4;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Sticky per-group headers within Upcoming/Past sections.
+   "Country · Month-Year" pins to the top of the scroll container as
+   the user moves between months — same effect as Flighty's flight log. */
+.stay-group { position: relative; }
+.stay-group-header {
+  position: sticky; top: 0; z-index: 3;
+  padding: 6px 20px;
+  font: 600 11px var(--font-mono);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.stay-section-header { z-index: 4; }

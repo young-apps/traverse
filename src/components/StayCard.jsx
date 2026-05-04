@@ -38,15 +38,18 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
           {!up && stay.rating ? (
             <div className="stay-rating">{"★".repeat(stay.rating)}<span className="stay-rating-empty">{"★".repeat(5 - stay.rating)}</span></div>
           ) : null}
-          <div className="stay-nights">{stay.nights}n</div>
         </div>
       </div>
 
+      {/* Single line: dates + nights + booking source. Saves vertical
+          space vs. the previous two-row layout where nights lived in the
+          right rail. */}
       <div className="stay-date-line">
         <span className="stay-date-big">{fmtDate(stay.checkIn)}</span>
         <span className="stay-date-arrow">→</span>
         <span className="stay-date-big">{fmtDate(stay.checkOut)}</span>
         <span className="stay-date-year">{fmtYear(stay.checkIn)}</span>
+        <span className="stay-nights stay-nights-inline">· {stay.nights}n</span>
         {stay.bookedVia && <span className="stay-via">{stay.bookedVia}</span>}
       </div>
 

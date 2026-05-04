@@ -16,6 +16,7 @@ import Header from "./Header";
 // Deferring the import means Mapbox doesn't load until a signed-in user
 // actually hits the home tab.
 const MapView = lazy(() => import("./MapView"));
+import MapHome from "./MapHome";
 import StayList from "./StayList";
 import StayCard from "./StayCard";
 import ScrollContextHeader from "./ScrollContextHeader";
@@ -113,56 +114,21 @@ function Dashboard({ user }) {
 
       {justAdded && <div className="toast"><span className="toast-check">✓</span> Added {justAdded}</div>}
 
-      {/* ─── HOME ─── */}
+      {/* ─── HOME ─── full-bleed map + draggable swipe-up sheet */}
       {tab === "home" && (
-        <>
-          <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
-            <MapView stays={stays} selectedId={selectedId} onSelect={setSelectedId} celebrateAt={celebrate} />
-          </Suspense>
-          <ScrollContextHeader />
-          {upcoming.length > 0 && (
-            <div className="section">
-              <div className="section-title">Upcoming Stays</div>
-              {upcoming.slice(0, 3).map((s) => (
-                <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
-                  onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
-                  onDelete={handleDelete} onEdit={setEditStay} />
-              ))}
-              {upcoming.length > 3 && <button className="link-btn" onClick={() => setTab("stays")}>View all {upcoming.length} upcoming →</button>}
-            </div>
-          )}
-          {past.length > 0 && (
-            <div className="section">
-              <div className="section-title" style={{ color: "var(--text-dim)" }}>Recent Stays</div>
-              {past.slice(0, 2).map((s) => (
-                <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
-                  onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
-                  onDelete={handleDelete} onEdit={setEditStay} />
-              ))}
-              {past.length > 2 && <button className="link-btn" onClick={() => setTab("stays")}>View all {stays.length} stays →</button>}
-            </div>
-          )}
-          {stays.length === 0 && (
-            <div className="empty-hero">
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--accent-muted)", border: "1px solid var(--accent-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8"><path d="M3 21V7l9-4 9 4v14"/><path d="M9 21v-4h6v4"/></svg>
-              </div>
-              <div className="empty-title">Track your hotel journey</div>
-              <div className="empty-sub">Log your first stay to build your passport with stats, maps, and a history of everywhere you've been.</div>
-              <button className="btn-primary btn-lg" onClick={() => setShowAdd(true)}>+ Log Your First Stay</button>
-            </div>
-          )}
-        </>
+        <MapHome
+          stays={stays} upcoming={upcoming} past={past}
+          selectedId={selectedId} onSelect={setSelectedId}
+          onDelete={handleDelete} onEdit={setEditStay}
+          onAdd={() => setShowAdd(true)} celebrate={celebrate}
+        />
       )}
 
-      {/* ─── MY STAYS ─── */}
+      {/* ─── MY STAYS ─── sticky group headers live inside the list now */}
       {tab === "stays" && (
-        <>
-          <ScrollContextHeader />
-          <StayList stays={stays} selectedId={selectedId}
-            onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
-            onDelete={handleDelete} onAdd={() => setShowAdd(true)} onEdit={setEditStay} />
-        </>
+        <StayList stays={stays} selectedId={selectedId}
+          onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
+          onDelete={handleDelete} onAdd={() => setShowAdd(true)} onEdit={setEditStay} />
       )}
 
       {/* ─── INSIGHTS ─── */}

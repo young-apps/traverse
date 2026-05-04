@@ -1,6 +1,25 @@
-// StayList — clear sections, Flighty-like filter chips
+// StayList — clear sections, Flighty-like filter chips, sticky group
+// headers grouped by Country · Month-Year. Replaces the old free-floating
+// scroll-context bar.
 import { useState, useMemo } from "react";
 import StayCard from "./StayCard";
+
+const groupKey = (s) => {
+  const d = s.checkIn ? new Date(s.checkIn + "T00:00:00") : null;
+  const my = d ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "Unknown";
+  const country = s.country || "—";
+  return `${country} · ${my}`;
+};
+const groupBy = (arr) => {
+  const out = [];
+  let cur = null;
+  for (const s of arr) {
+    const k = groupKey(s);
+    if (!cur || cur.key !== k) { cur = { key: k, items: [] }; out.push(cur); }
+    cur.items.push(s);
+  }
+  return out;
+};
 
 export default function StayList({ stays, selectedId, onSelect, onDelete, onAdd, onEdit }) {
   const [search, setSearch] = useState("");
@@ -60,26 +79,36 @@ export default function StayList({ stays, selectedId, onSelect, onDelete, onAdd,
         </select>
       </div>
 
-      {/* Sectioned list */}
-      {filter === "all" && upcoming.length > 0 && (
+      {/* Sectioned list. Each Upcoming/Past block is sub-grouped by
+          Country · Month-Year with a sticky header that pins to the top
+          of the scroll container as the user moves through the list. */}
+      {filter !== "past" && upcoming.length > 0 && (
         <div className="stay-section">
           <div className="stay-section-header upcoming">Upcoming · {upcoming.length}</div>
-          {upcoming.map((s) => <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />)}
+          {groupBy(upcoming).map((g) => (
+            <div key={`u-${g.key}`} className="stay-group">
+              <div className="stay-group-header">{g.key}</div>
+              {g.items.map((s) => (
+                <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />
+              ))}
+            </div>
+          ))}
         </div>
       )}
 
-      {(() => {
-        // When the user picks the Upcoming or Past chip we render only that
-        // already-sorted section; in "all" we render past below upcoming.
-        const list = filter === "upcoming" ? upcoming : filter === "past" ? past : past;
-        if (!list.length) return null;
-        return (
-          <div className="stay-section">
-            {filter === "all" && past.length > 0 && <div className="stay-section-header past">Past · {past.length}</div>}
-            {list.map((s) => <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />)}
-          </div>
-        );
-      })()}
+      {filter !== "upcoming" && past.length > 0 && (
+        <div className="stay-section">
+          <div className="stay-section-header past">Past · {past.length}</div>
+          {groupBy(past).map((g) => (
+            <div key={`p-${g.key}`} className="stay-group">
+              <div className="stay-group-header">{g.key}</div>
+              {g.items.map((s) => (
+                <StayCard key={s.id} stay={s} isSelected={selectedId === s.id} onSelect={onSelect} onDelete={onDelete} onEdit={onEdit} />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {filtered.length === 0 && <div className="empty-state">{stays.length === 0 ? "No stays yet" : "No stays match your search"}</div>}
     </div>

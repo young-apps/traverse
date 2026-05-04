@@ -173,12 +173,26 @@ export async function declineFriendRequest(myUid, requestId) {
 }
 
 // ── Friends ──
-export function removeFriend(myUid, friendUid) {
-  // Remove from both sides
-  return Promise.all([
-    deleteDoc(doc(db, "users", myUid, "friends", friendUid)),
-    deleteDoc(doc(db, "users", friendUid, "friends", myUid)),
-  ]);
+// Remove the friendship document on BOTH sides. Each side is awaited
+// independently because Firestore rules may permit one delete and not
+// the other (e.g. you can always delete from your own collection but
+// not always from theirs); we don't want one failure to silently
+// abandon the other delete. We also wipe the in-memory directory cache
+// so the user reappears in "Everyone on Traverse" without a hard
+// reload, which was the source of the zombie-profile reports.
+export async function removeFriend(myUid, friendUid) {
+  const errors = [];
+  try { await deleteDoc(doc(db, "users", myUid, "friends", friendUid)); }
+  catch (e) { errors.push(["self", e]); }
+  try { await deleteDoc(doc(db, "users", friendUid, "friends", myUid)); }
+  catch (e) { errors.push(["other", e]); }
+  invalidateDirectoryCache();
+  if (errors.length) {
+    // Log but don't throw if at least the local side succeeded — the
+    // realtime listener will reflect the local removal regardless.
+    console.warn("[removeFriend] partial failure", errors);
+    if (errors.length === 2) throw errors[0][1];
+  }
 }
 
 export function subscribeToFriends(uid, callback) {
