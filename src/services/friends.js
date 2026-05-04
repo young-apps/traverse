@@ -68,12 +68,48 @@ let _directoryCache = null;
 let _directoryFetchedAt = 0;
 const DIRECTORY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// De-dupe orphaned profile docs by email. When a user deletes their
+// Firebase Auth account and signs up again with the same email, Auth
+// hands out a fresh uid -- the old /users/{oldUid}/profile/main doc
+// stays behind as a zombie. The collectionGroup query returns every
+// one of those, which is why "mattyoung25@icloud.com" showed up three
+// times in the directory after a few delete+recreate cycles.
+//
+// We keep one entry per email (case-insensitive). Preference order:
+//   1. The doc with the most recent updatedAt timestamp.
+//   2. Tie-break: prefer the one with a real displayName (Matt Young)
+//      over one whose displayName is just the email.
+//
+// Profiles without an email fall through to uid as the dedupe key so
+// edge cases (anonymous sign-ins, partial writes) still produce one
+// row each instead of being silently dropped.
+function dedupeProfiles(profiles) {
+  const byKey = new Map();
+  for (const p of profiles) {
+    const key = (p.email || p.uid || "").toLowerCase().trim();
+    if (!key) continue;
+    const existing = byKey.get(key);
+    if (!existing) { byKey.set(key, p); continue; }
+    // Prefer newer updatedAt; Firestore Timestamps expose .toMillis().
+    const ms = (x) => (x?.updatedAt?.toMillis ? x.updatedAt.toMillis() : 0);
+    const newer = ms(p) > ms(existing) ? p
+                : ms(p) < ms(existing) ? existing
+                // Same/missing timestamp: prefer the one whose displayName
+                // isn't just the email (i.e. a real human name).
+                : (p.displayName && p.displayName !== p.email) ? p
+                : existing;
+    byKey.set(key, newer);
+  }
+  return [...byKey.values()];
+}
+
 async function loadDirectory() {
   if (_directoryCache && Date.now() - _directoryFetchedAt < DIRECTORY_TTL_MS) {
     return _directoryCache;
   }
   const snap = await getDocs(collectionGroup(db, "profile"));
-  _directoryCache = snap.docs.map((d) => d.data()).filter((p) => p && p.uid);
+  const all = snap.docs.map((d) => d.data()).filter((p) => p && p.uid);
+  _directoryCache = dedupeProfiles(all);
   _directoryFetchedAt = Date.now();
   return _directoryCache;
 }
