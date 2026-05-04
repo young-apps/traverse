@@ -366,3 +366,26 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
   border-bottom: 1px solid var(--border);
 }
 .stay-section-header { z-index: 4; }
+
+/* ─── Friends Map ─────────────────────────────────────────────── */
+.friends-map-wrap { position: relative; height: calc(100dvh - 56px - 60px - 56px); margin: 0 0 16px; }
+.friends-map { position: absolute; inset: 0; }
+.friends-map-legend {
+  position: absolute; left: 16px; bottom: 16px; z-index: 5;
+  display: flex; gap: 12px; padding: 8px 12px;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(10px);
+  border: 1px solid var(--border); border-radius: 10px;
+  font: 600 11px var(--font-mono); color: var(--text-secondary);
+}
+.friends-map-count { color: var(--text-dim); border-left: 1px solid var(--border); padding-left: 12px; }
+.friends-map-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255,255,255,.85); backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.fpop-row { padding: 6px 0; border-top: 1px solid var(--border); }
+.fpop-row.upcoming .fpop-friend { color: var(--green); }
+.fpop-friend { font: 600 12px var(--font-sans); color: var(--text); }
+.fpop-meta { font: 11px var(--font-mono); color: var(--text-dim); }
+.fpop-more { padding-top: 6px; font: 11px var(--font-mono); color: var(--text-dim); text-align: center; }

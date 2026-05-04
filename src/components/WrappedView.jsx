@@ -68,16 +68,46 @@ export default function WrappedView({ user, stays }) {
     return { ...calcYearData(yearStays), period: `${selectedYear}` };
   }, [stays, selectedYear]);
 
+  // "Save to Photos" needs to actually land in the iOS Photos app, not
+  // just trigger a hidden anchor download (which WKWebView silently drops
+  // on iOS — the original bug). The Web Share API with a File payload is
+  // supported by Capacitor WKWebView on iOS 15+ and exposes the system
+  // share sheet, which includes "Save Image" → Photos. On the web we
+  // keep the anchor-download as fallback.
   const handleSave = async () => {
     if (!cardRef.current || !window.html2canvas) return;
     setSaving(true);
     try {
       const canvas = await window.html2canvas(cardRef.current, { scale: 2, backgroundColor: "#FFFFFF", useCORS: true });
+      const filename = `traverse-wrapped-${data.period.toLowerCase().replace(/\s+/g, "-")}.png`;
+      // canvas.toBlob is async; promisify it.
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png", 0.95));
+      if (!blob) throw new Error("toBlob failed");
+      const file = new File([blob], filename, { type: "image/png" });
+
+      // Preferred: native share sheet (iOS / Android / Safari Share API).
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "Traverse Wrapped", text: `${firstName}'s travel year` });
+          setSaving(false);
+          return;
+        } catch (shareErr) {
+          // User cancelled — that's fine, don't fall through to download.
+          if (shareErr?.name === "AbortError") { setSaving(false); return; }
+          console.warn("[wrapped] share failed, falling back to download", shareErr);
+        }
+      }
+
+      // Web fallback: object URL anchor download.
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `traverse-wrapped-${data.period.toLowerCase().replace(" ", "-")}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
       link.click();
-    } catch (e) { console.error(e); }
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) { console.error("[wrapped] save failed", e); }
     setSaving(false);
   };
 

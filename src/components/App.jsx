@@ -24,6 +24,9 @@ import AddStayModal from "./AddStayModal";
 import EditStayModal from "./EditStayModal";
 import StatsView from "./StatsView";
 import FriendsView from "./FriendsView";
+// Lazy: same reason as MapView — Mapbox spawns a worker on module-eval
+// and shouldn't run before the user opens the Friend Map tab.
+const FriendsMapView = lazy(() => import("./FriendsMapView"));
 import LeaderboardView from "./LeaderboardView";
 import WrappedView from "./WrappedView";
 import CalendarView from "./CalendarView";
@@ -141,6 +144,7 @@ function Dashboard({ user }) {
             {[
               { id: "calendar", label: "Calendar" },
               { id: "friends", label: `Friends${requests.length > 0 ? " ●" : ""}` },
+              { id: "friends-map", label: "Friend Map" },
               { id: "ranks", label: "Ranks" },
               { id: "wrapped", label: "Wrapped" },
             ].map((t) => (
@@ -150,6 +154,11 @@ function Dashboard({ user }) {
           </div>
           {exploreSub === "calendar" && <CalendarView stays={stays} />}
           {exploreSub === "friends" && <FriendsView user={user} friends={friends} requests={requests} friendStays={friendStays} onRefresh={refreshFriendStays} />}
+          {exploreSub === "friends-map" && (
+            <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
+              <FriendsMapView friends={friends} friendStays={friendStays} />
+            </Suspense>
+          )}
           {exploreSub === "ranks" && <LeaderboardView user={user} stays={stays} friends={friends} friendStays={friendStays} />}
           {exploreSub === "wrapped" && <WrappedView user={user} stays={stays} />}
         </>
