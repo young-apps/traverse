@@ -23,7 +23,26 @@ mapboxgl.accessToken = MAPBOX_TOKEN;
 
 const SOURCE = "stays-src";
 
+// Build the geojson source for the map. We pre-compute an `opacity`
+// property per upcoming stay so the next trip is a vivid, fully-opaque
+// green and the further-out trips fade toward translucent — a visual
+// "this is the trip that's actually next" cue. Past stays are uniform
+// slate. Selected stays always render at full opacity regardless.
 function staysToGeoJSON(stays, selectedId) {
+  // Order upcoming by checkIn ascending so rank 0 = soonest.
+  const upcoming = stays
+    .filter((s) => s.status === "upcoming" && typeof s.lat === "number" && s.checkIn)
+    .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+  const opacityFor = (id) => {
+    const idx = upcoming.findIndex((s) => s.id === id);
+    if (idx < 0) return 1;                          // not in the upcoming list
+    if (upcoming.length === 1) return 1;            // only one upcoming → full
+    // Linear ramp 1.0 (next) → 0.35 (furthest). Anything past the
+    // top-10 stays at 0.35 so a long backlog of plans still reads as
+    // "less urgent" without disappearing.
+    const t = Math.min(idx / Math.max(1, Math.min(upcoming.length - 1, 9)), 1);
+    return Number((1 - t * 0.65).toFixed(2));
+  };
   return {
     type: "FeatureCollection",
     features: stays.filter((s) => typeof s.lat === "number").map((s) => ({
@@ -34,6 +53,7 @@ function staysToGeoJSON(stays, selectedId) {
         nights: s.nights || 0, rating: s.rating || 0, status: s.status || "past",
         checkIn: s.checkIn || "", checkOut: s.checkOut || "",
         isSelected: s.id === selectedId,
+        opacity: s.status === "upcoming" ? opacityFor(s.id) : 0.6,
       },
     })),
   };
@@ -71,24 +91,32 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
         console.log("[mapbox] style loaded — adding stay layers");
         map.addSource(SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
-        // Glow for selected
+        // Glow for selected — green for upcoming, slate for past so the
+        // halo matches the dot color now that past is no longer purple.
         map.addLayer({ id: "glow", type: "circle", source: SOURCE, filter: ["==", ["get", "isSelected"], true],
-          paint: { "circle-radius": 24, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#4F46E5"], "circle-opacity": 0.18, "circle-blur": 1 } });
+          paint: { "circle-radius": 24, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#64748B"], "circle-opacity": 0.18, "circle-blur": 1 } });
 
-        // Past dots — slate, larger for tappability. Dark stroke so they show on light map.
+        // Past dots — uniform slate gray so the eye can ignore them and
+        // focus on what's coming up next.
         map.addLayer({ id: "past", type: "circle", source: SOURCE,
           filter: ["all", ["==", ["get", "status"], "past"], ["==", ["get", "isSelected"], false]],
-          paint: { "circle-radius": 8, "circle-color": "#4F46E5", "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.25)", "circle-opacity": 0.85 } });
+          paint: { "circle-radius": 7, "circle-color": "#64748B", "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.18)", "circle-opacity": 0.55 } });
 
-        // Upcoming dots — green
+        // Upcoming dots — uniform green hue, but per-feature opacity that
+        // ramps from 1.0 (the very next stay) down to ~0.35 (furthest
+        // out). The opacity lives on the feature itself in
+        // staysToGeoJSON so reordering happens automatically as trips
+        // pass and re-rank.
         map.addLayer({ id: "upcoming", type: "circle", source: SOURCE,
           filter: ["all", ["==", ["get", "status"], "upcoming"], ["==", ["get", "isSelected"], false]],
-          paint: { "circle-radius": 9, "circle-color": "#3DD68C", "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.3)", "circle-opacity": 0.95 } });
+          paint: { "circle-radius": 9, "circle-color": "#3DD68C",
+            "circle-stroke-width": 2, "circle-stroke-color": "rgba(15,23,42,0.3)",
+            "circle-opacity": ["get", "opacity"] } });
 
-        // Selected — prominent
+        // Selected — prominent, always full opacity.
         map.addLayer({ id: "selected", type: "circle", source: SOURCE,
           filter: ["==", ["get", "isSelected"], true],
-          paint: { "circle-radius": 12, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#4F46E5"],
+          paint: { "circle-radius": 12, "circle-color": ["case", ["==", ["get", "status"], "upcoming"], "#3DD68C", "#64748B"],
             "circle-stroke-width": 3, "circle-stroke-color": "#fff", "circle-opacity": 1 } });
 
         setReady(true);
@@ -162,13 +190,39 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
     mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 5, duration: 0 });
   }, [stays.length, ready]);
 
+  // Reset the view: clear any selection and either fit all valid stays
+  // (preferred — the user can still see where they've been) or fall
+  // back to a true world view if there are no stays yet.
+  const resetView = () => {
+    if (!mapRef.current) return;
+    onSelect && onSelect(null);
+    const valid = stays.filter((s) => typeof s.lat === "number");
+    if (valid.length) {
+      const bounds = new mapboxgl.LngLatBounds();
+      valid.forEach((s) => bounds.extend([s.lng, s.lat]));
+      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 4, duration: 800 });
+    } else {
+      mapRef.current.flyTo({ center: [10, 30], zoom: 1.5, duration: 800 });
+    }
+  };
+
   return (
     <div className="map-section">
       <div ref={containerRef} className="map-container" />
       {error && <div className="map-loading">{error}</div>}
+      <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
+        title="Zoom out to see all stays">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20"/>
+          <path d="M12 2a15 15 0 010 20"/>
+          <path d="M12 2a15 15 0 000 20"/>
+        </svg>
+      </button>
       <div className="map-legend">
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#4F46E5" }} /> Past</span>
-        <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C", boxShadow: "0 0 6px #3DD68C80" }} /> Upcoming</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#64748B" }} /> Past</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C", boxShadow: "0 0 6px #3DD68C80" }} /> Next up</span>
+        <span className="legend-item"><span className="legend-dot" style={{ background: "#3DD68C", opacity: 0.4 }} /> Later</span>
       </div>
     </div>
   );

@@ -389,3 +389,18 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .fpop-friend { font: 600 12px var(--font-sans); color: var(--text); }
 .fpop-meta { font: 11px var(--font-mono); color: var(--text-dim); }
 .fpop-more { padding-top: 6px; font: 11px var(--font-mono); color: var(--text-dim); text-align: center; }
+
+/* ─── Map reset button ──────────────────────────────────────────── */
+.map-reset-btn {
+  position: absolute; top: 12px; right: 12px; z-index: 6;
+  width: 36px; height: 36px; padding: 0;
+  border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(255,255,255,.95); backdrop-filter: blur(10px);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15,23,42,.08);
+  transition: transform .15s, color .15s;
+}
+.map-reset-btn:hover { color: var(--accent); transform: scale(1.05); }
+.map-reset-btn:active { transform: scale(0.95); }
