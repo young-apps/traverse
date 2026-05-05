@@ -503,6 +503,28 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 }
 .stay-section-header { z-index: 4; }
 
+/* ─── Map diagnostic overlay (toggle via DiagPanel or ?diag=map) ─
+   High contrast, monospaced, top-left. Pointer-events: none so it
+   never intercepts taps on the underlying map. */
+.map-diag {
+  position: absolute; top: 8px; left: 8px; z-index: 50;
+  max-width: calc(100% - 16px);
+  padding: 8px 10px; border-radius: 8px;
+  background: rgba(15,23,42,0.86);
+  color: #E2E8F0;
+  font: 500 10px/1.4 var(--font-mono);
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  pointer-events: none;
+  white-space: pre-wrap; word-break: break-all;
+}
+.map-diag .map-diag-row { margin-top: 2px; }
+.map-diag .map-diag-row:first-child { margin-top: 0; font-size: 11px; }
+.map-diag .ok { color: #3DD68C; }
+.map-diag .fail { color: #F59E0B; }
+.map-diag .map-diag-net { color: #94A3B8; font-size: 9px; }
+.map-diag .map-diag-err { color: #FCA5A5; font-size: 9px; padding-top: 2px; border-top: 1px solid rgba(255,255,255,.1); margin-top: 4px; }
+.map-diag .map-diag-origin { color: #94A3B8; font-size: 9px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,.15); margin-top: 4px; }
+
 /* ─── Friends Map ─────────────────────────────────────────────── */
 .friends-map-split {
   display: flex; flex-direction: column;

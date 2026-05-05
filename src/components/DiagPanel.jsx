@@ -93,6 +93,19 @@ export default function DiagPanel({ onClose, user, stays = [] }) {
             {backfilling ? "Backfilling…" : `Backfill metro areas (${stays.filter((s) => !s.metroArea && s.lat != null).length})`}
           </button>
           {backfillStatus && <span style={{ font: "10px var(--font-mono)", color: "var(--text-dim)" }}>{backfillStatus}</span>}
+          {/* Map diag overlay toggle — sticks via localStorage so it
+              survives a TestFlight relaunch. Useful when the map
+              renders blank on device but works on desktop. */}
+          <button
+            onClick={() => {
+              const cur = localStorage.getItem("mapDiag") === "1";
+              if (cur) localStorage.removeItem("mapDiag"); else localStorage.setItem("mapDiag", "1");
+              window.location.reload();
+            }}
+            style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", background: localStorage.getItem("mapDiag") === "1" ? "var(--accent-muted)" : "var(--surface)", color: "var(--text-secondary)", font: "11px var(--font-mono)", cursor: "pointer" }}
+          >
+            Map diag overlay: {localStorage.getItem("mapDiag") === "1" ? "ON" : "OFF"}
+          </button>
         </div>
       )}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px", font: "11px/1.45 var(--font-mono)" }}>

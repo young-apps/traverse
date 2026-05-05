@@ -15,6 +15,7 @@
 // with their next upcoming stay date or their most recent past visit.
 
 import { useEffect, useRef, useState } from "react";
+import MapDiag, { isMapDiagEnabled } from "./MapDiag";
 // Shared mapbox-gl module — single workerClass + accessToken across
 // the whole app. Importing mapbox-gl in two files with `?worker&inline`
 // in each was the bug: Vite created TWO worker classes, and whichever
@@ -82,6 +83,9 @@ export default function FriendsMapView({ friends, friendStays }) {
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
+  // Re-render when the map instance is set, so MapDiag receives it.
+  const [mapInstance, setMapInstance] = useState(null);
+  const diagOn = isMapDiagEnabled();
 
   // Mount the map once. Defer construction until the container has
   // real pixel dimensions — mapbox-gl creates a 0×0 GL canvas if the
@@ -159,6 +163,7 @@ export default function FriendsMapView({ friends, friendStays }) {
       });
 
       mapRef.current = map;
+      setMapInstance(map);
 
       // Watch the container for size changes (passport-tabs scrolling
       // in, virtual keyboard, orientation flips) and tell Mapbox to
@@ -239,6 +244,7 @@ export default function FriendsMapView({ friends, friendStays }) {
       <div className="map-home-pane map-pane">
         <div ref={containerRef} className="friends-map" />
         {error && <div className="map-loading">{error}</div>}
+        {diagOn && <MapDiag map={mapInstance} container={containerRef.current} label="friends-map" />}
         <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
           title="Zoom out to see all friends">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

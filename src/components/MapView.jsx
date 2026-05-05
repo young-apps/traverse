@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 // set exactly once across MapView and FriendsMapView. See
 // services/mapbox.js for the rationale.
 import mapboxgl, { MAPBOX_STYLE_LIGHT, whenSized } from "../services/mapbox";
+import MapDiag, { isMapDiagEnabled } from "./MapDiag";
 
 const SOURCE = "stays-src";
 
@@ -58,6 +59,8 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const diagOn = isMapDiagEnabled();
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -143,6 +146,7 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
       });
 
       mapRef.current = map;
+      setMapInstance(map);
     }).catch((e) => {
       console.error("[map] init failed", e);
       setError("Map failed to load");
@@ -239,6 +243,7 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
     <div className="map-section">
       <div ref={containerRef} className="map-container" />
       {error && <div className="map-loading">{error}</div>}
+      {diagOn && <MapDiag map={mapInstance} container={containerRef.current} label="home-map" />}
       <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
         title="Zoom out to see all stays">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
