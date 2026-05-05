@@ -47,6 +47,10 @@ function detectGL() {
 
 export default function MapDiag({ map, container, label = "map" }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // Mapbox's actual GL drawing buffer. If this stays 0×0 while the
+  // container has size, the canvas was sized AFTER context creation
+  // and never reconciled — exactly the iOS WKWebView bug.
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0, dpr: 1 });
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [sourceLoaded, setSourceLoaded] = useState(false);
   const [tilesLoaded, setTilesLoaded] = useState(false);
@@ -87,7 +91,18 @@ export default function MapDiag({ map, container, label = "map" }) {
     map.on("sourcedata", onSourceData);
     map.on("error", onError);
     if (map.loaded()) setStyleLoaded(true);
+
+    // Poll the GL drawing buffer 4×/sec. If the CSS box has size but
+    // the canvas backbuffer is 0×0 we know the resize never reconciled.
+    const id = setInterval(() => {
+      try {
+        const c = map.getCanvas();
+        setCanvasSize({ w: c.width, h: c.height, dpr: window.devicePixelRatio || 1 });
+      } catch {}
+    }, 250);
+
     return () => {
+      clearInterval(id);
       map.off("load", onLoad);
       map.off("sourcedata", onSourceData);
       map.off("error", onError);
@@ -110,9 +125,25 @@ export default function MapDiag({ map, container, label = "map" }) {
     return () => { if (map._requestManager && orig) map._requestManager.transformRequest = orig; };
   }, [map]);
 
+  // Manual force-resize. If tapping this and tiles suddenly start
+  // rendering, we've confirmed the resize-after-layout race.
+  const forceResize = () => {
+    if (!map) return;
+    try {
+      map.resize();
+      map.triggerRepaint();
+    } catch {}
+  };
+
+  const canvasZero = canvasSize.w === 0 || canvasSize.h === 0;
+
   return (
-    <div className="map-diag" aria-hidden>
-      <div className="map-diag-row"><b>{label}</b> · {size.w}×{size.h}</div>
+    <div className="map-diag">
+      <div className="map-diag-row"><b>{label}</b> · css {size.w}×{size.h}</div>
+      <div className="map-diag-row">
+        canvas: <span className={canvasZero ? "fail" : "ok"}>{canvasSize.w}×{canvasSize.h}</span>
+        {" "}@ dpr {canvasSize.dpr}
+      </div>
       <div className="map-diag-row">{glRef.current}</div>
       <div className="map-diag-row">
         style: <span className={styleLoaded ? "ok" : "fail"}>{styleLoaded ? "loaded" : "pending"}</span>
@@ -126,6 +157,9 @@ export default function MapDiag({ map, container, label = "map" }) {
         </div>
       )}
       <div className="map-diag-row map-diag-origin">origin: {typeof window !== "undefined" ? window.location.origin : "?"}</div>
+      <div className="map-diag-row">
+        <button onClick={forceResize} className="map-diag-btn">Force resize</button>
+      </div>
     </div>
   );
 }

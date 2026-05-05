@@ -524,6 +524,13 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .map-diag .map-diag-net { color: #94A3B8; font-size: 9px; }
 .map-diag .map-diag-err { color: #FCA5A5; font-size: 9px; padding-top: 2px; border-top: 1px solid rgba(255,255,255,.1); margin-top: 4px; }
 .map-diag .map-diag-origin { color: #94A3B8; font-size: 9px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,.15); margin-top: 4px; }
+.map-diag .map-diag-btn {
+  pointer-events: auto;
+  margin-top: 6px; padding: 6px 10px;
+  background: rgba(255,255,255,.12); color: #fff;
+  border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+  font: 600 10px var(--font-mono); cursor: pointer;
+}
 
 /* ─── Friends Map ─────────────────────────────────────────────── */
 .friends-map-split {

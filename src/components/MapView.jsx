@@ -88,6 +88,31 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
 
       map.on("load", () => {
         console.log("[mapbox] style loaded — adding stay layers");
+        // iOS WKWebView fix — see FriendsMapView for full rationale.
+        // Reconcile the GL drawing buffer with the CSS box for ~3s
+        // until they match for two consecutive ticks.
+        const reconcile = () => {
+          const el = containerRef.current;
+          if (!el || !map || map._removed) return false;
+          const r = el.getBoundingClientRect();
+          const c = map.getCanvas();
+          const dpr = window.devicePixelRatio || 1;
+          const expectedW = Math.round(r.width * dpr);
+          const expectedH = Math.round(r.height * dpr);
+          if (c.width !== expectedW || c.height !== expectedH) {
+            map.resize();
+            map.triggerRepaint();
+            return false;
+          }
+          return true;
+        };
+        let stable = 0;
+        const rId = setInterval(() => {
+          if (reconcile()) stable++; else stable = 0;
+          if (stable >= 2) clearInterval(rId);
+        }, 150);
+        setTimeout(() => clearInterval(rId), 3000);
+
         map.addSource(SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 
         // Glow for selected — green for upcoming, slate for past so the
