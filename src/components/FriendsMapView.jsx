@@ -106,11 +106,38 @@ export default function FriendsMapView({ friends, friendStays }) {
       map.on("error", (e) => console.error("[friends-map]", e?.error?.message || e));
 
       map.on("load", () => {
-        // Defensive resize: on tab-switch the parent flex pane often has
-        // a 0-height layout pass at the moment the map is constructed,
-        // and Mapbox locks its canvas to that initial size. Forcing a
-        // resize after first paint reads the now-correct container size.
-        requestAnimationFrame(() => map.resize());
+        // iOS WKWebView fix: on Capacitor builds the GL drawing buffer
+        // is sometimes locked at 0×0 even when the CSS box has size,
+        // because layout commits AFTER mapbox samples devicePixelRatio
+        // and getBoundingClientRect during canvas creation. Symptom:
+        // style + glyphs + iconset all 200, but ZERO vector tile fetches
+        // because the painter thinks viewport area is zero.
+        //
+        // Fix: poll for the next ~2 seconds — whenever the CSS box and
+        // GL drawing buffer disagree, force a resize + repaint. Bails
+        // as soon as they match for two consecutive ticks.
+        const reconcile = () => {
+          const el = containerRef.current;
+          if (!el || !map || map._removed) return false;
+          const r = el.getBoundingClientRect();
+          const c = map.getCanvas();
+          const dpr = window.devicePixelRatio || 1;
+          const expectedW = Math.round(r.width * dpr);
+          const expectedH = Math.round(r.height * dpr);
+          if (c.width !== expectedW || c.height !== expectedH) {
+            map.resize();
+            map.triggerRepaint();
+            return false;
+          }
+          return true;
+        };
+        let stable = 0;
+        const id = setInterval(() => {
+          if (reconcile()) stable++; else stable = 0;
+          if (stable >= 2) clearInterval(id);
+        }, 150);
+        // Stop reconciling no matter what after 3s.
+        setTimeout(() => clearInterval(id), 3000);
         map.addSource(SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         // Past = slate, upcoming = green. We split layers by an
         // "upcoming > 0" property so the bias is toward forward travel.
