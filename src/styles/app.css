@@ -358,20 +358,39 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 }
 
 /* ─── Card density + status colors (Phase post-feedback) ──────────
-   - Past = gray accent (slate left rail, dim text)
-   - Upcoming = purple accent (using --accent which is purple in tokens)
-   - Inline nights save a row of vertical space.                    */
-.stay-card { padding: 12px 20px; }
+   - Past = slate gray
+   - Upcoming (later) = purple — same theme accent
+   - Next up = green — visually distinguishes the immediately-next trip
+   Cards collapse to a single dense subline so most stays render in
+   ~2 visual lines instead of 3-4. */
+.stay-card { padding: 10px 18px; }
 .stay-card.upcoming { border-left-color: var(--accent); background: var(--accent-muted); }
 .stay-card.upcoming .stay-hotel { color: var(--text); }
 .stay-card.upcoming .stay-date-big { color: var(--accent); }
+.stay-card.upcoming.next-up { border-left-color: var(--green); background: var(--green-muted); }
+.stay-card.upcoming.next-up .stay-date-big { color: var(--green); }
 .stay-card.past { opacity: 1; border-left-color: rgba(100,116,139,.45); background: var(--surface); }
 .stay-card.past .stay-hotel,
 .stay-card.past .stay-date-big,
 .stay-card.past .stay-location { color: var(--text-secondary); }
 .stay-card.past .stay-nights { color: var(--text-dim); }
-.stay-main { margin-bottom: 4px; }
-.stay-nights-inline { font: 600 12px var(--font-mono); color: var(--text-dim); margin-left: 2px; }
+
+/* Compact 2-row layout: hotel on its own row, then a single dense
+   subline with location, dates, nights, and badges that wraps at the
+   container edge. Wrapping is allowed but on phone widths most cards
+   fit on a single subline thanks to short city names + "5n" shorthand. */
+.stay-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+.stay-head .stay-hotel { font: 600 16px/1.25 var(--font-display); }
+.stay-meta-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  font: 500 13px var(--font-sans); color: var(--text-secondary);
+}
+.stay-meta-row .stay-location-link { font: inherit; color: var(--text-secondary); }
+.stay-meta-row .stay-date-big { font: 600 13px var(--font-sans); }
+.stay-meta-row .stay-date-year { font: 500 12px var(--font-mono); color: var(--text-dim); }
+.stay-meta-row .stay-date-arrow { color: var(--text-dim); }
+.stay-meta-dot { color: var(--text-dim); }
+.stay-nights-inline { font: 600 12px var(--font-mono); color: var(--text-dim); }
 
 /* Sticky per-section headers inside the list — Flighty-style.
    Replaces the floating .scroll-ctx bar. The wrapper around each

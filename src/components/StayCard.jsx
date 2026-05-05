@@ -5,7 +5,7 @@ const fmtYear = (d) => d ? new Date(d + "T00:00:00").getFullYear() : "";
 // "Jan 2026" — used by ScrollContextHeader's data-month-year attribute.
 const fmtMonthYear = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
 
-export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit }) {
+export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit, isNext }) {
   const up = stay.status === "upcoming";
 
   const openInMaps = (e) => {
@@ -14,42 +14,38 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit 
     window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank");
   };
 
+  // Compact layout: hotel name on top, then ONE dense subline that
+  // wraps "City, Country · May 8 → May 13 · 5n · badges". Wraps to a
+  // second visual line on narrow screens but stays one logical row, so
+  // most cards collapse to ~2 lines instead of 3-4.
   return (
-    <div className={`stay-card ${isSelected ? "selected" : ""} ${up ? "upcoming" : "past"}`}
+    <div className={`stay-card ${isSelected ? "selected" : ""} ${up ? "upcoming" : "past"} ${isNext ? "next-up" : ""}`}
       data-stay-id={stay.id}
       data-country={stay.country || ""}
       data-month-year={fmtMonthYear(stay.checkIn)}
       onClick={() => onSelect(stay.id)}>
-      <div className="stay-main">
-        <div className="stay-left">
-          <div className="stay-hotel">{stay.hotel}</div>
-          <div className="stay-location">
-            <button className="stay-location-link" onClick={openInMaps} title="Open in Google Maps">
-              {stay.city}, {stay.country}
-            </button>
-            {stay.roomType && <span className="stay-room-badge">{stay.roomType}</span>}
-            {stay.tripPurpose && <span className="stay-trip-badge">{stay.tripPurpose}</span>}
-            {stay.upgradeStatus && stay.upgradeStatus !== "None" && (
-              <span className="stay-upgrade-badge">{stay.upgradeStatus}</span>
-            )}
-          </div>
-        </div>
-        <div className="stay-right">
-          {!up && stay.rating ? (
-            <div className="stay-rating">{"★".repeat(stay.rating)}<span className="stay-rating-empty">{"★".repeat(5 - stay.rating)}</span></div>
-          ) : null}
-        </div>
+      <div className="stay-head">
+        <div className="stay-hotel">{stay.hotel}</div>
+        {!up && stay.rating ? (
+          <div className="stay-rating">{"★".repeat(stay.rating)}<span className="stay-rating-empty">{"★".repeat(5 - stay.rating)}</span></div>
+        ) : null}
       </div>
-
-      {/* Single line: dates + nights + booking source. Saves vertical
-          space vs. the previous two-row layout where nights lived in the
-          right rail. */}
-      <div className="stay-date-line">
+      <div className="stay-meta-row">
+        <button className="stay-location-link" onClick={openInMaps} title="Open in Google Maps">
+          {stay.city}, {stay.country}
+        </button>
+        {stay.tripPurpose && <span className="stay-trip-badge">{stay.tripPurpose}</span>}
+        <span className="stay-meta-dot">·</span>
         <span className="stay-date-big">{fmtDate(stay.checkIn)}</span>
         <span className="stay-date-arrow">→</span>
         <span className="stay-date-big">{fmtDate(stay.checkOut)}</span>
         <span className="stay-date-year">{fmtYear(stay.checkIn)}</span>
-        <span className="stay-nights stay-nights-inline">· {stay.nights}n</span>
+        <span className="stay-meta-dot">·</span>
+        <span className="stay-nights stay-nights-inline">{stay.nights}n</span>
+        {stay.roomType && <span className="stay-room-badge">{stay.roomType}</span>}
+        {stay.upgradeStatus && stay.upgradeStatus !== "None" && (
+          <span className="stay-upgrade-badge">{stay.upgradeStatus}</span>
+        )}
         {stay.bookedVia && <span className="stay-via">{stay.bookedVia}</span>}
       </div>
 

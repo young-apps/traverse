@@ -97,6 +97,11 @@ export default function FriendsMapView({ friends, friendStays }) {
       map.on("error", (e) => console.error("[friends-map]", e?.error?.message || e));
 
       map.on("load", () => {
+        // Defensive resize: on tab-switch the parent flex pane often has
+        // a 0-height layout pass at the moment the map is constructed,
+        // and Mapbox locks its canvas to that initial size. Forcing a
+        // resize after first paint reads the now-correct container size.
+        requestAnimationFrame(() => map.resize());
         map.addSource(SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         // Past = slate, upcoming = green. We split layers by an
         // "upcoming > 0" property so the bias is toward forward travel.
@@ -149,8 +154,19 @@ export default function FriendsMapView({ friends, friendStays }) {
       });
 
       mapRef.current = map;
+
+      // Watch the container for size changes (parent pane resolving its
+      // flex-basis, drawer detents shifting) and tell Mapbox to redraw
+      // its canvas. Without this the tiles render at the initial size
+      // and stay there even after the pane grows.
+      const ro = new ResizeObserver(() => { try { map.resize(); } catch {} });
+      ro.observe(containerRef.current);
+      mapRef.current._ro = ro;
     } catch (e) { console.error(e); setError("Map failed to load"); }
-    return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+    return () => {
+      if (mapRef.current?._ro) mapRef.current._ro.disconnect();
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
   }, []);
 
   // Push features whenever friends or shared stays change. Memoized so
