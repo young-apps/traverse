@@ -1,25 +1,9 @@
 // MapView — interactive Mapbox map with tappable markers + clean popovers
 import { useEffect, useRef, useState, useCallback } from "react";
-// Use the CSP build of mapbox-gl. The regular esm-min build has a
-// fallback `new Worker('./worker.js')` baked in; in production that
-// resolves to /assets/worker.js which Vite never emits, 404s, and
-// the map silently fails. The CSP build has no implicit worker URL
-// — it requires us to set `workerClass`, which we do below with the
-// inlined worker module.
-import mapboxgl from "mapbox-gl/dist/mapbox-gl-csp";
-// Inline the Mapbox CSP worker so it's same-origin in Capacitor's
-// WebView and a base64 blob in browser builds. No external fetch.
-import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
-mapboxgl.workerClass = MapboxWorker;
-// Mapbox GL ships its canvas/control styles separately. Without this
-// import the GL canvas renders at 0×0 inside .map-container.
-import "mapbox-gl/dist/mapbox-gl.css";
-
-// Surface missing-token early so iOS App Store builds don't render a
-// silently-blank map when the env var didn't get baked in.
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
-if (!MAPBOX_TOKEN) console.error("[MapView] VITE_MAPBOX_TOKEN missing from build");
-mapboxgl.accessToken = MAPBOX_TOKEN;
+// Shared mapbox-gl module — ensures the workerClass + accessToken are
+// set exactly once across MapView and FriendsMapView. See
+// services/mapbox.js for the rationale.
+import mapboxgl, { MAPBOX_STYLE_LIGHT, whenSized } from "../services/mapbox";
 
 const SOURCE = "stays-src";
 
@@ -78,9 +62,13 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     if (!mapboxgl.accessToken) { setError("Set VITE_MAPBOX_TOKEN in .env"); return; }
-    try {
+    let cancelled = false;
+    // Defer construction until the container actually has pixels.
+    whenSized(containerRef.current).then((r) => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      console.log("[map] init", r.width, "×", r.height);
       const map = new mapboxgl.Map({
-        container: containerRef.current, style: "mapbox://styles/mapbox/light-v11",
+        container: containerRef.current, style: MAPBOX_STYLE_LIGHT,
         center: [10, 30], zoom: 1.5, attributionControl: false,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -155,8 +143,14 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
       });
 
       mapRef.current = map;
-    } catch (e) { setError("Map failed to load"); }
-    return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+    }).catch((e) => {
+      console.error("[map] init failed", e);
+      setError("Map failed to load");
+    });
+    return () => {
+      cancelled = true;
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
   }, []);
 
   // Update data

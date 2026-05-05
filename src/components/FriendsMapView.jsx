@@ -15,15 +15,14 @@
 // with their next upcoming stay date or their most recent past visit.
 
 import { useEffect, useRef, useState } from "react";
-// Same Mapbox CSP-worker pattern as MapView.jsx — see those comments
-// for why the regular esm build silently fails in WKWebView.
-import mapboxgl from "mapbox-gl/dist/mapbox-gl-csp";
-import MapboxWorker from "mapbox-gl/dist/mapbox-gl-csp-worker?worker&inline";
-mapboxgl.workerClass = MapboxWorker;
-import "mapbox-gl/dist/mapbox-gl.css";
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
-mapboxgl.accessToken = MAPBOX_TOKEN;
+// Shared mapbox-gl module — single workerClass + accessToken across
+// the whole app. Importing mapbox-gl in two files with `?worker&inline`
+// in each was the bug: Vite created TWO worker classes, and whichever
+// component initialized last clobbered the previous one's worker —
+// the older map kept running but its tile worker had been replaced
+// with a class it didn't know about, so requests silently never
+// rendered. See services/mapbox.js.
+import mapboxgl, { MAPBOX_STYLE_LIGHT, whenSized } from "../services/mapbox";
 
 const SOURCE = "friend-cities";
 
@@ -84,13 +83,19 @@ export default function FriendsMapView({ friends, friendStays }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
 
-  // Mount the map once. Same pattern + workarounds as MapView.jsx.
+  // Mount the map once. Defer construction until the container has
+  // real pixel dimensions — mapbox-gl creates a 0×0 GL canvas if the
+  // container is unsized at construction time, never fires `load`,
+  // and a later resize() doesn't always recover on iOS WebView.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     if (!mapboxgl.accessToken) { setError("Set VITE_MAPBOX_TOKEN in .env"); return; }
-    try {
+    let cancelled = false;
+    whenSized(containerRef.current).then((r) => {
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      console.log("[friends-map] init", r.width, "×", r.height);
       const map = new mapboxgl.Map({
-        container: containerRef.current, style: "mapbox://styles/mapbox/light-v11",
+        container: containerRef.current, style: MAPBOX_STYLE_LIGHT,
         center: [10, 30], zoom: 1.4, attributionControl: false,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -155,15 +160,19 @@ export default function FriendsMapView({ friends, friendStays }) {
 
       mapRef.current = map;
 
-      // Watch the container for size changes (parent pane resolving its
-      // flex-basis, drawer detents shifting) and tell Mapbox to redraw
-      // its canvas. Without this the tiles render at the initial size
-      // and stay there even after the pane grows.
+      // Watch the container for size changes (passport-tabs scrolling
+      // in, virtual keyboard, orientation flips) and tell Mapbox to
+      // redraw its canvas. Without this the tiles render at the
+      // initial size and stay there even after the pane grows.
       const ro = new ResizeObserver(() => { try { map.resize(); } catch {} });
       ro.observe(containerRef.current);
       mapRef.current._ro = ro;
-    } catch (e) { console.error(e); setError("Map failed to load"); }
+    }).catch((e) => {
+      console.error("[friends-map] init failed", e);
+      setError("Map failed to load");
+    });
     return () => {
+      cancelled = true;
       if (mapRef.current?._ro) mapRef.current._ro.disconnect();
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
