@@ -296,11 +296,65 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
   100% { transform: scale(4); opacity: 0; }
 }
 
-/* ─── Map home: split pane (map on top, list below) ───────────────
-   Replaces the swipe-up sheet pattern. Map is always visible as the
-   visual anchor; list always scannable below. A toggle button in the
-   map's top-right cycles default → map-max → list-max → default so the
-   user can rebalance without losing either pane. */
+/* ─── Map home: drawer architecture ────────────────────────────────
+   Full-bleed map as the anchor; bottom sheet overlays the bottom edge
+   and slides between three detents (peek / half / full). Replaces the
+   prior split-pane layout. */
+.map-home-drawer {
+  position: relative;
+  height: calc(100dvh - 56px - 60px); /* viewport - header - bottom nav */
+  overflow: hidden;
+}
+.map-home-canvas {
+  position: absolute; inset: 0;
+  background: var(--surface, #fff);
+}
+.map-home-canvas .map-section { position: absolute; inset: 0; height: 100%; }
+.map-home-canvas .map-container { height: 100%; }
+
+/* Detent bottom sheet. Sits at the bottom of the canvas, expanding
+   upward to its current detent height. The handle at the top is the
+   drag affordance; the body below scrolls independently. */
+.bottom-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--surface, #fff);
+  border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 24px rgba(15,23,42,0.08);
+  display: flex; flex-direction: column;
+  transition: height 0.32s cubic-bezier(.22,1,.36,1);
+  z-index: 10;
+  overflow: hidden;
+}
+.bottom-sheet.dragging { transition: none; }
+.bottom-sheet-handle {
+  flex-shrink: 0; padding: 8px 16px 10px; cursor: grab;
+  border: none; background: transparent;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  touch-action: none; user-select: none;
+}
+.bottom-sheet-handle:active { cursor: grabbing; }
+.bottom-sheet-grabber {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: rgba(100,116,139,.45);
+  margin: 4px auto 0;
+}
+.bottom-sheet-peek {
+  text-align: center;
+  font: 600 13px var(--font-sans);
+  color: var(--text-secondary);
+}
+.bottom-sheet-summary { letter-spacing: .2px; }
+.bottom-sheet-body {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.bottom-sheet-body .split-list-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* Hide the head + body in peek mode — only the summary line shows. */
+.bottom-sheet.detent-peek .bottom-sheet-body { display: none; }
+
+/* ── Legacy split-pane styles below kept for FriendsMapView reuse ── */
 .map-home-split {
   display: flex; flex-direction: column;
   height: calc(100dvh - 56px - 60px); /* viewport - header - bottom nav */
@@ -462,7 +516,10 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 /* ─── Map reset button ──────────────────────────────────────────── */
 .map-reset-btn {
   position: absolute; top: 12px; right: 12px; z-index: 6;
-  width: 36px; height: 36px; padding: 0;
+  /* 44×44 minimum hit target per Apple HIG. The icon stays 16px so the
+     visual weight matches the prior 36px button — but one-handed taps
+     are now reliable. */
+  width: 44px; height: 44px; padding: 0;
   border-radius: 10px; border: 1px solid var(--border);
   background: rgba(255,255,255,.95); backdrop-filter: blur(10px);
   color: var(--text-secondary);

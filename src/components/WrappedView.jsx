@@ -201,9 +201,14 @@ export default function WrappedView({ user, stays }) {
 
           {data.cities.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {data.cities.map((c, i) => (
+              {/* Cap the tag cloud at 10 — captured image stays clean
+                  and the card doesn't sprawl on heavy travelers. */}
+              {data.cities.slice(0, 10).map((c, i) => (
                 <span key={i} style={{ padding: "3px 9px", borderRadius: 16, background: "rgba(15,23,42,0.04)", border: "1px solid rgba(15,23,42,0.08)", font: `500 11px ${SANS}`, color: INK_DIM }}>{c}</span>
               ))}
+              {data.cities.length > 10 && (
+                <span style={{ padding: "3px 9px", borderRadius: 16, background: "rgba(79,70,229,0.06)", border: "1px solid rgba(79,70,229,0.14)", font: `600 11px ${MONO}`, color: ACCENT }}>+{data.cities.length - 10} more</span>
+              )}
             </div>
           )}
         </div>

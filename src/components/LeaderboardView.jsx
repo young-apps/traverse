@@ -22,7 +22,15 @@ function Board({ title, emoji, entries }) {
     <div style={{ padding: 16, borderRadius: 14, background: "var(--surface)", border: "1px solid var(--border)", marginBottom: 12 }}>
       <div style={{ font: "600 10px var(--font-mono)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 12 }}>{emoji} {title}</div>
       {entries.map((e, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < entries.length - 1 ? "1px solid var(--border)" : "none" }}>
+        <div key={i} style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: e.isMe ? "8px 10px" : "8px 0",
+          margin: e.isMe ? "0 -10px" : 0,
+          borderRadius: e.isMe ? 10 : 0,
+          background: e.isMe ? "var(--accent-muted)" : "transparent",
+          boxShadow: e.isMe ? "inset 0 0 0 1px var(--accent-border)" : "none",
+          borderBottom: !e.isMe && i < entries.length - 1 ? "1px solid var(--border)" : "none",
+        }}>
           <RankBadge rank={i + 1} />
           <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: e.isMe ? "var(--accent-muted)" : "var(--surface-hover)", border: `1px solid ${e.isMe ? "var(--accent-border)" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
             {e.photoURL ? <img src={e.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ font: "600 11px var(--font-mono)", color: e.isMe ? "var(--accent)" : "var(--text-dim)" }}>{e.initial}</span>}
