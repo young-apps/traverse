@@ -10,7 +10,7 @@
 // "Show all stays" reset bar appears at the top of the drawer body
 // whenever a city filter is active.
 
-import { lazy, Suspense, useState, useEffect, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import StayCard from "./StayCard";
 import BottomSheet from "./BottomSheet";
 import { tap as hapticTap } from "../services/haptics";
@@ -22,6 +22,12 @@ export default function MapHome({
   onDelete, onEdit, onAdd, celebrate,
 }) {
   const [detent, setDetent] = useState("peek");
+  // Visible drawer height in px, fed up from BottomSheet on every
+  // detent change. Passed straight into MapView as padding.bottom so
+  // flyTo centers selected pins in the visible slice of the globe
+  // (above the drawer) rather than under it.
+  const [drawerPx, setDrawerPx] = useState(110);
+  const handleVisibleHeight = useCallback((h) => setDrawerPx(h), []);
   const nextUpId = upcoming[0]?.id;
 
   // Derive a city filter from the selected stay (set when a pin is
@@ -62,13 +68,15 @@ export default function MapHome({
     <div className="map-home-drawer">
       <div className="map-home-canvas">
         <Suspense fallback={<div className="loading-text" style={{ padding: 40, textAlign: "center" }}>Loading map…</div>}>
-          <MapView stays={stays} selectedId={selectedId} onSelect={onSelect} celebrateAt={celebrate} />
+          <MapView stays={stays} selectedId={selectedId} onSelect={onSelect}
+            celebrateAt={celebrate} paddingBottom={drawerPx} />
         </Suspense>
       </div>
 
       <BottomSheet
         detent={detent}
         onDetentChange={handleDetent}
+        onVisibleHeightChange={handleVisibleHeight}
         peekContent={<span className="bottom-sheet-summary">{summary}</span>}
       >
         <div className="split-list-head">

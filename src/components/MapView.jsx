@@ -61,7 +61,15 @@ function staysToGeoJSON(stays, selectedId) {
 
 const fmtD = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
-export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
+export default function MapView({ stays, selectedId, onSelect, celebrateAt, paddingBottom = 0 }) {
+  // Why paddingBottom matters: the home view overlays a drawer on the
+  // bottom of the map. Without telling Mapbox about that occlusion,
+  // flyTo and fitBounds center their target in the *full* canvas — so
+  // the selected pin lands underneath the drawer. Passing the drawer's
+  // current pixel height as padding.bottom shifts the effective
+  // viewport up so the pin stays in the visible slice above the sheet.
+  const padRef = useRef(paddingBottom);
+  padRef.current = paddingBottom;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -158,19 +166,38 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
     if (src) src.setData(staysToGeoJSON(stays, selectedId));
   }, [stays, selectedId, ready]);
 
-  // Fly to selected
+  // Fly to selected. padding.bottom is the drawer height — Mapbox
+  // treats it as occluded and offsets the center upward by half of it.
   useEffect(() => {
     if (!mapRef.current || !selectedId) return;
     const s = stays.find((x) => x.id === selectedId);
-    if (s?.lat) mapRef.current.flyTo({ center: [s.lng, s.lat], zoom: 11, duration: 1200 });
-  }, [selectedId]);
+    if (s?.lat) mapRef.current.flyTo({
+      center: [s.lng, s.lat], zoom: 11, duration: 1200,
+      padding: { top: 20, bottom: padRef.current, left: 20, right: 20 },
+    });
+  }, [selectedId, paddingBottom]);
+
+  // When the drawer detent changes (paddingBottom updates) and a stay
+  // is selected, easeTo re-centers it for the new visible slice.
+  // Keeps the active pin in view as the drawer grows or shrinks.
+  useEffect(() => {
+    if (!mapRef.current || !selectedId) return;
+    const s = stays.find((x) => x.id === selectedId);
+    if (s?.lat) mapRef.current.easeTo({
+      center: [s.lng, s.lat], duration: 320,
+      padding: { top: 20, bottom: paddingBottom, left: 20, right: 20 },
+    });
+  }, [paddingBottom]);
 
   // Pin-drop celebration: when a stay is saved, fly to it and pulse a marker.
   useEffect(() => {
     if (!mapRef.current || !ready || !celebrateAt) return;
     const { lat, lng, key } = celebrateAt;
     if (typeof lat !== "number" || typeof lng !== "number") return;
-    mapRef.current.flyTo({ center: [lng, lat], zoom: 6, duration: 1400, essential: true });
+    mapRef.current.flyTo({
+      center: [lng, lat], zoom: 6, duration: 1400, essential: true,
+      padding: { top: 20, bottom: padRef.current, left: 20, right: 20 },
+    });
     const el = document.createElement("div");
     el.className = "pin-drop";
     el.innerHTML = '<span class="pin-drop-pulse"></span><span class="pin-drop-dot"></span>';
@@ -180,14 +207,19 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
     return () => { clearTimeout(t); marker.remove(); };
   }, [celebrateAt?.key, ready]);
 
-  // Fit all on load
+  // Fit all on load. padding.bottom keeps the bounds out from under
+  // the drawer; we add a little extra side padding so coastal stays
+  // don't hug the edge.
   useEffect(() => {
     if (!mapRef.current || !ready || !stays.length) return;
     const valid = stays.filter((s) => typeof s.lat === "number");
     if (!valid.length) return;
     const bounds = new mapboxgl.LngLatBounds();
     valid.forEach((s) => bounds.extend([s.lng, s.lat]));
-    mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 5, duration: 0 });
+    mapRef.current.fitBounds(bounds, {
+      padding: { top: 60, bottom: padRef.current + 40, left: 50, right: 50 },
+      maxZoom: 5, duration: 0,
+    });
   }, [stays.length, ready]);
 
   // Reset the view: clear any selection and either fit all valid stays
@@ -200,7 +232,10 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt }) {
     if (valid.length) {
       const bounds = new mapboxgl.LngLatBounds();
       valid.forEach((s) => bounds.extend([s.lng, s.lat]));
-      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 4, duration: 800 });
+      mapRef.current.fitBounds(bounds, {
+        padding: { top: 60, bottom: padRef.current + 40, left: 60, right: 60 },
+        maxZoom: 4, duration: 800,
+      });
     } else {
       mapRef.current.flyTo({ center: [10, 30], zoom: 1.5, duration: 800 });
     }

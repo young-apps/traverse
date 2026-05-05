@@ -312,21 +312,36 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .map-home-canvas .map-section { position: absolute; inset: 0; height: 100%; }
 .map-home-canvas .map-container { height: 100%; }
 
-/* Detent bottom sheet. Sits at the bottom of the canvas, expanding
-   upward to its current detent height. The handle at the top is the
-   drag affordance; the body below scrolls independently. */
+/* Detent bottom sheet — overlay drawer.
+   Render height is fixed (92dvh). Detent changes are animated by
+   translateY only — compositor-only, so the drawer slides at 60fps
+   even on older WebKit/WebView builds. The background is translucent
+   with a backdrop blur so the persistent globe stays visible through
+   the sheet, reinforcing "the map is the document, the list is an
+   accessory" mental model. */
 .bottom-sheet {
   position: absolute; left: 0; right: 0; bottom: 0;
-  background: var(--surface, #fff);
-  border-top: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 -8px 24px rgba(15,23,42,0.08);
+  height: 92dvh;
+  /* Translucent frosted glass — alpha low enough that pin colors and
+     coastline contours read through, high enough that body text stays
+     legible against busy map backgrounds. Backdrop blur is hardware
+     accelerated on iOS WKWebView via CoreAnimation. */
+  background: rgba(255,255,255,0.78);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  border-top: 1px solid rgba(255,255,255,0.6);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -10px 30px rgba(15,23,42,0.12);
   display: flex; flex-direction: column;
-  transition: height 0.32s cubic-bezier(.22,1,.36,1);
+  /* No transition declared inline — it's set by JS so we can disable
+     it during a drag without paying a recompute on every frame. */
   z-index: 10;
   overflow: hidden;
+  /* Promote to its own compositor layer so transform animation never
+     repaints the map underneath. */
+  will-change: transform;
 }
-.bottom-sheet.dragging { transition: none; }
+.bottom-sheet.dragging { /* JS already sets transition:none during drag */ }
 .bottom-sheet-handle {
   flex-shrink: 0; padding: 8px 16px 10px; cursor: grab;
   border: none; background: transparent;
@@ -351,8 +366,26 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
   overflow: hidden;
 }
 .bottom-sheet-body .split-list-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-/* Hide the head + body in peek mode — only the summary line shows. */
-.bottom-sheet.detent-peek .bottom-sheet-body { display: none; }
+/* The body is always rendered (so transform animations don't reflow
+   children mid-glide), but in peek mode it's clipped behind the
+   bottom edge of the viewport anyway thanks to the translateY. We
+   also pointer-disable it so the user can't accidentally tap a card
+   that's offscreen.  */
+.bottom-sheet.detent-peek .bottom-sheet-body { pointer-events: none; }
+
+/* List head + cards inherit the translucent treatment so the drawer
+   reads as a single piece of frosted glass. Card backgrounds drop
+   their accent-muted fills here — the colored left rail still
+   communicates upcoming/next-up/past status without painting an
+   opaque rectangle over the map. */
+.bottom-sheet .split-list-head {
+  background: transparent;
+  border-bottom-color: rgba(15,23,42,0.06);
+}
+.bottom-sheet .stay-card { background: transparent; }
+.bottom-sheet .stay-card.upcoming { background: rgba(79,70,229,0.06); }
+.bottom-sheet .stay-card.upcoming.next-up { background: rgba(61,214,140,0.10); }
+.bottom-sheet .section-title { background: transparent; }
 
 /* ── Legacy split-pane styles below kept for FriendsMapView reuse ── */
 .map-home-split {
