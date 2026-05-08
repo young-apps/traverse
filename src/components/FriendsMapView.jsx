@@ -267,9 +267,15 @@ export default function FriendsMapView({ friends, friendStays }) {
   });
 
   return (
-    <div className="friends-map-split">
-      <div className="map-home-pane map-pane">
-        <div ref={containerRef} className="friends-map" />
+    // Inline-style sizing as a hard contract: stale CDN CSS or any
+    // future class-based override can't make this collapse to 0 px,
+    // because element-style beats every author-stylesheet rule short
+    // of !important. The map pane gets a fixed 60dvh slice, the list
+    // pane gets the rest, and the parent enforces a 480 px floor so
+    // landscape phones don't squash either pane to nothing.
+    <div className="friends-map-split" style={{ display: "flex", flexDirection: "column", minHeight: 480, height: "calc(100dvh - 168px)", overflow: "hidden" }}>
+      <div className="map-home-pane map-pane" style={{ flex: "1 1 auto", minHeight: 280, position: "relative" }}>
+        <div ref={containerRef} className="friends-map" style={{ position: "absolute", inset: 0 }} />
         {error && <div className="map-loading">{error}</div>}
         {diagOn && <MapDiag map={mapInstance} container={containerRef.current} label="friends-map" />}
         <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
@@ -285,7 +291,7 @@ export default function FriendsMapView({ friends, friendStays }) {
         </div>
       </div>
 
-      <div className="map-home-pane list-pane">
+      <div className="map-home-pane list-pane" style={{ flex: "0 1 auto", minHeight: 180, maxHeight: "50%", overflowY: "auto", display: "flex", flexDirection: "column" }}>
         <div className="split-list-head">
           <div className="split-list-title">
             {features.length > 0
