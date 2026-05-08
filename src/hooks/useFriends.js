@@ -10,7 +10,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { subscribeToFriends, subscribeToFriendRequests, getFriendStays } from "../services/friends";
 
-const todayISO = () => new Date().toISOString().split("T")[0];
+// Local wall-clock YYYY-MM-DD; see useStays for rationale on why
+// toISOString() is the wrong source.
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const deriveStatus = (s, today) => {
   if (!s.checkOut) return s.status || "past";
   return s.checkOut > today ? "upcoming" : "past";

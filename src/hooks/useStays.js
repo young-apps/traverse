@@ -12,7 +12,14 @@
 import { useEffect, useState } from "react";
 import { subscribeToStays } from "../services/stays";
 
-const todayISO = () => new Date().toISOString().split("T")[0];
+// Local-date YYYY-MM-DD. Using toISOString() returns UTC, which for
+// users east of UTC drifts back by up to a day — a stay with a checkOut
+// of "this morning" reads as still upcoming because UTC hasn't ticked
+// over yet. Compare against the user's wall clock instead.
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const deriveStatus = (s, today) => {
   if (!s.checkOut) return s.status || "past";
   // checkOut is the morning of departure -> the stay is "past" once
