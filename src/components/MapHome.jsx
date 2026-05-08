@@ -14,7 +14,64 @@ import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from "react
 import StayCard from "./StayCard";
 import BottomSheet from "./BottomSheet";
 import HomeHighlights from "./HomeHighlights";
+import LayoutToggle from "./LayoutToggle";
 import { tap as hapticTap } from "../services/haptics";
+
+const fmtShort = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+
+// PeekCard — the content shown in the drawer's peek state. Replaces
+// the old "X countries · Y stays" summary line. Showing real data
+// (next-up trip details, or last stay if there's nothing upcoming)
+// makes the peek state feel like the top of a list rather than a
+// label, so users instinctively understand there's more below.
+//
+// Empty state stays text-only because that's the moment we want to
+// drive the "Add your first stay" CTA, not preview a non-existent one.
+function PeekCard({ stays, upcoming, past }) {
+  if (!stays.length) {
+    return <span className="bottom-sheet-summary">No stays yet — tap to add</span>;
+  }
+  const next = upcoming[0];
+  const last = past[0];
+  if (next) {
+    const days = Math.max(0, Math.ceil((new Date(next.checkIn + "T00:00:00") - Date.now()) / 864e5));
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "0 4px" }}>
+        <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: "var(--green-muted, rgba(61,214,140,.18))", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--green, #3DD68C)", font: "700 11px var(--font-mono)" }}>
+          {days === 0 ? "Now" : `${days}d`}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ font: "600 13px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {next.hotel || next.city}
+          </div>
+          <div style={{ font: "11px var(--font-mono)", color: "var(--text-secondary)", marginTop: 1 }}>
+            Up next · {fmtShort(next.checkIn)}{next.nights ? ` · ${next.nights}n` : ""}
+          </div>
+        </div>
+        <span style={{ font: "10px var(--font-mono)", color: "var(--text-dim)", letterSpacing: ".5px" }}>{stays.length} total</span>
+      </div>
+    );
+  }
+  if (last) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "0 4px" }}>
+        <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 10, background: "rgba(100,116,139,.14)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", font: "700 11px var(--font-mono)" }}>
+          ★
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ font: "600 13px var(--font-sans)", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {last.hotel || last.city}
+          </div>
+          <div style={{ font: "11px var(--font-mono)", color: "var(--text-secondary)", marginTop: 1 }}>
+            Last stay · {fmtShort(last.checkIn)}
+          </div>
+        </div>
+        <span style={{ font: "10px var(--font-mono)", color: "var(--text-dim)", letterSpacing: ".5px" }}>{stays.length} total</span>
+      </div>
+    );
+  }
+  return <span className="bottom-sheet-summary">{stays.length} stays</span>;
+}
 
 const MapView = lazy(() => import("./MapView"));
 
@@ -22,7 +79,14 @@ export default function MapHome({
   stays, upcoming, past, selectedId, onSelect,
   onDelete, onEdit, onAdd, celebrate,
 }) {
-  const [detent, setDetent] = useState("peek");
+  // Smart default: returning users with stays land in split view
+  // (they want to see what they have); first-run users land at peek
+  // (the empty list would crowd the empty-state CTA, and the goal is
+  // to push them toward "+ Log Your First Stay"). Using a lazy
+  // initializer so the count is checked once on mount, not every
+  // render — once the user manually picks a detent, that decision
+  // sticks for the session.
+  const [detent, setDetent] = useState(() => (stays.length > 0 ? "half" : "peek"));
   // Visible drawer height in px, fed up from BottomSheet on every
   // detent change. Passed straight into MapView as padding.bottom so
   // flyTo centers selected pins in the visible slice of the globe
@@ -60,11 +124,6 @@ export default function MapHome({
     ? past.filter((s) => `${s.country}::${s.city}` === focusKey)
     : past;
 
-  const countries = new Set(stays.map((s) => s.country).filter(Boolean)).size;
-  const summary = stays.length === 0
-    ? "No stays yet — tap to add"
-    : `${countries} countries · ${stays.length} stays${upcoming.length ? ` · ${upcoming.length} upcoming` : ""}`;
-
   return (
     <div className="map-home-drawer">
       <div className="map-home-canvas">
@@ -76,13 +135,21 @@ export default function MapHome({
             rotate every few seconds. Kept above the map, hidden when
             there's nothing meaningful to show. */}
         <HomeHighlights stays={stays} />
+        {/* Layout toggle — visible affordance for the same state
+            machine the bottom-sheet handle drives. Most users won't
+            think to drag a 4 px gray bar; this button makes the
+            three layouts a one-tap operation. Hidden when the user
+            has no stays (peek is the only sensible state then). */}
+        {stays.length > 0 && (
+          <LayoutToggle value={detent} onChange={handleDetent} />
+        )}
       </div>
 
       <BottomSheet
         detent={detent}
         onDetentChange={handleDetent}
         onVisibleHeightChange={handleVisibleHeight}
-        peekContent={<span className="bottom-sheet-summary">{summary}</span>}
+        peekContent={<PeekCard stays={stays} upcoming={upcoming} past={past} />}
       >
         <div className="split-list-head">
           <div className="split-list-title">
