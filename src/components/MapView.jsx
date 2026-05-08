@@ -269,14 +269,43 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
       <div ref={containerRef} className="map-container" />
       {error && <div className="map-loading">{error}</div>}
       {diagOn && <MapDiag map={mapInstance} container={containerRef.current} label="home-map" />}
-      <button className="map-reset-btn" onClick={resetView} aria-label="Reset map view"
-        title="Zoom out to see all stays">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M2 12h20"/>
-          <path d="M12 2a15 15 0 010 20"/>
-          <path d="M12 2a15 15 0 000 20"/>
+      {/* Reset / fit-all control. Inline-styled to match LayoutToggle's
+          frosted pill so the two floating chips read as a matched pair
+          along the top of the map. The "Fit all" label is far less
+          ambiguous than a bare globe icon — users were reading the old
+          icon as "switch to globe view" instead of "zoom to all stays". */}
+      <button onClick={resetView} aria-label="Fit all stays in view"
+        title="Zoom out to see every stay"
+        style={{
+          position: "absolute",
+          top: "max(60px, calc(env(safe-area-inset-top, 0px) + 56px))",
+          left: 12,
+          zIndex: 7,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "6px 10px",
+          minHeight: 36,
+          borderRadius: 999,
+          background: "rgba(255,255,255,0.92)",
+          WebkitBackdropFilter: "blur(12px) saturate(1.4)",
+          backdropFilter: "blur(12px) saturate(1.4)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 4px 14px rgba(15,23,42,.10)",
+          color: "var(--text-secondary, #475569)",
+          font: "600 11px var(--font-sans)",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+        }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* "Fit-to-screen" four-corner brackets — the universal
+              shorthand for "frame everything in view". */}
+          <path d="M4 9V5a1 1 0 011-1h4"/>
+          <path d="M20 9V5a1 1 0 00-1-1h-4"/>
+          <path d="M4 15v4a1 1 0 001 1h4"/>
+          <path d="M20 15v4a1 1 0 01-1 1h-4"/>
         </svg>
+        <span>Fit all</span>
       </button>
       <div className="map-legend">
         <span className="legend-item"><span className="legend-dot" style={{ background: "#64748B" }} /> Past</span>
