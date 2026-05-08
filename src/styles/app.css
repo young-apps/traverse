@@ -627,14 +627,32 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .brand-tier-meta-dim { color: var(--text-dim); }
 
 /* ─── Friends Map ─────────────────────────────────────────────── */
+/* The old layout used `height: calc(100dvh - 168px)` plus `flex-basis: 56%`
+   on the map pane. That chain has two failure modes seen in the wild:
+   (1) dvh evaluates to 0 in some browsers during the first layout pass,
+   collapsing the whole split to 0 px tall; (2) header / tabs / nav aren't
+   actually 168 px combined on every device, so the calc under- or
+   over-shoots and percentages of a wrong total cascade.
+
+   The replacement: hard floor on each pane via `min-height` so the map
+   has visual area even if every percentage above it resolves to 0, plus
+   `flex: 1` on the map pane so when there IS extra height it absorbs it. */
 .friends-map-split {
   display: flex; flex-direction: column;
-  /* Subtract: header (~56) + bottom nav (60) + explore tabs (~52). */
   height: calc(100dvh - 56px - 60px - 52px);
+  min-height: 480px;
   overflow: hidden;
 }
-.friends-map-split .map-pane { flex-basis: 56%; }
-.friends-map-split .list-pane { flex-basis: 44%; }
+.friends-map-split .map-pane {
+  flex: 1 1 auto;
+  min-height: 280px;     /* hard floor — never collapse below this */
+}
+.friends-map-split .list-pane {
+  flex: 0 1 auto;
+  min-height: 180px;
+  max-height: 50%;
+  overflow-y: auto;
+}
 .friends-map { position: absolute; inset: 0; }
 .friends-map-legend {
   position: absolute; left: 12px; bottom: 12px; z-index: 5;
