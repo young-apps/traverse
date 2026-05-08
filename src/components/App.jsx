@@ -124,6 +124,7 @@ function Dashboard({ user }) {
           selectedId={selectedId} onSelect={setSelectedId}
           onDelete={handleDelete} onEdit={setEditStay}
           onAdd={() => setShowAdd(true)} celebrate={celebrate}
+          onSwitchToStaysTab={() => setTab("stays")}
         />
       )}
 

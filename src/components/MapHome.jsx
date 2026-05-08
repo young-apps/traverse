@@ -10,10 +10,9 @@
 // "Show all stays" reset bar appears at the top of the drawer body
 // whenever a city filter is active.
 
-import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from "react";
+import { lazy, Suspense, useState, useMemo, useCallback } from "react";
 import StayCard from "./StayCard";
 import BottomSheet from "./BottomSheet";
-import HomeHighlights from "./HomeHighlights";
 import LayoutToggle from "./LayoutToggle";
 import { tap as hapticTap } from "../services/haptics";
 
@@ -77,7 +76,7 @@ const MapView = lazy(() => import("./MapView"));
 
 export default function MapHome({
   stays, upcoming, past, selectedId, onSelect,
-  onDelete, onEdit, onAdd, celebrate,
+  onDelete, onEdit, onAdd, celebrate, onSwitchToStaysTab,
 }) {
   // Smart default: returning users with stays land in split view
   // (they want to see what they have); first-run users land at peek
@@ -103,16 +102,16 @@ export default function MapHome({
   const focusKey = selectedStay ? `${selectedStay.country}::${selectedStay.city}` : null;
   const focusLabel = selectedStay ? `${selectedStay.city}, ${selectedStay.country}` : null;
 
-  // Auto-snap to half detent when a pin is tapped — the user wants to
-  // see what's at that location without losing the map context. Don't
-  // re-snap if they've already manually expanded to full.
-  useEffect(() => {
-    if (!selectedId) return;
-    setDetent((d) => d === "full" ? "full" : "half");
-    hapticTap();
-  }, [selectedId]);
-
+  // Layout toggle handler. "full" (List) is no longer a drawer detent —
+  // it routes the user to the My Stays tab where details are editable.
+  // The Home view stays focused on the map + split list, never hiding
+  // the globe behind a full-height drawer.
   const handleDetent = (next) => {
+    if (next === "full") {
+      hapticTap();
+      onSwitchToStaysTab?.();
+      return;
+    }
     setDetent(next);
     hapticTap();
   };
@@ -131,10 +130,6 @@ export default function MapHome({
           <MapView stays={stays} selectedId={selectedId} onSelect={onSelect}
             celebrateAt={celebrate} paddingBottom={drawerPx} />
         </Suspense>
-        {/* Floating storyteller card — ambient YTD highlights that
-            rotate every few seconds. Kept above the map, hidden when
-            there's nothing meaningful to show. */}
-        <HomeHighlights stays={stays} />
         {/* Layout toggle — visible affordance for the same state
             machine the bottom-sheet handle drives. Most users won't
             think to drag a 4 px gray bar; this button makes the
@@ -178,7 +173,7 @@ export default function MapHome({
                   {filteredUpcoming.map((s) => (
                     <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
                       isNext={s.id === nextUpId}
-                      onSelect={onSelect}
+                      onSelect={onSelect} compact
                       onDelete={onDelete} onEdit={onEdit} />
                   ))}
                 </div>
@@ -188,7 +183,7 @@ export default function MapHome({
                   <div className="section-title" style={{ color: "var(--text-dim)" }}>Recent Stays</div>
                   {filteredPast.map((s) => (
                     <StayCard key={s.id} stay={s} isSelected={selectedId === s.id}
-                      onSelect={onSelect}
+                      onSelect={onSelect} compact
                       onDelete={onDelete} onEdit={onEdit} />
                   ))}
                 </div>

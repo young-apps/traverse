@@ -5,7 +5,7 @@ const fmtYear = (d) => d ? new Date(d + "T00:00:00").getFullYear() : "";
 // "Jan 2026" — used by ScrollContextHeader's data-month-year attribute.
 const fmtMonthYear = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
 
-export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit, isNext }) {
+export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit, isNext, compact }) {
   const up = stay.status === "upcoming";
 
   const openInMaps = (e) => {
@@ -49,7 +49,7 @@ export default function StayCard({ stay, isSelected, onSelect, onDelete, onEdit,
         {stay.bookedVia && <span className="stay-via">{stay.bookedVia}</span>}
       </div>
 
-      {isSelected && (
+      {isSelected && !compact && (
         <div className="stay-detail">
           {stay.photoUrl && (
             <img className="stay-photo" src={stay.photoUrl} alt={stay.hotel} loading="lazy" />
