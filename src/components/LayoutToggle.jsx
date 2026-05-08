@@ -54,7 +54,7 @@ export default function LayoutToggle({ value = "peek", onChange }) {
       aria-label="Home layout"
       style={{
         position: "absolute",
-        top: "max(60px, calc(env(safe-area-inset-top, 0px) + 56px))", // below highlights pill
+        top: 12,
         right: 12,
         zIndex: 7,
         display: "flex",

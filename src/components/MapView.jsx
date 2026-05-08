@@ -278,7 +278,7 @@ export default function MapView({ stays, selectedId, onSelect, celebrateAt, padd
         title="Zoom out to see every stay"
         style={{
           position: "absolute",
-          top: "max(60px, calc(env(safe-area-inset-top, 0px) + 56px))",
+          top: 12,
           left: 12,
           zIndex: 7,
           display: "inline-flex",
