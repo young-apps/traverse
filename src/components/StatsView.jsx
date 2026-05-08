@@ -18,6 +18,44 @@ const BRAND_PATTERNS = [
 ];
 function detectBrand(n) { if (!n) return "Independent"; for (const p of BRAND_PATTERNS) if (p.match.test(n)) return p.brand; return "Independent"; }
 
+// Loyalty-tier ladders, simplified to nights-only requirements (most
+// programs ALSO accept stays-or-points-or-revenue, but nights is the
+// universal currency we already track). Source: each program's public
+// elite-status page as of 2026. Numbers are intentionally conservative
+// — we'd rather under-promise the user's progress than show "1 night
+// to Diamond" and have them book a stay only to learn they needed
+// stays/points too.
+const BRAND_TIERS = {
+  Marriott: [{ name: "Silver", n: 10 }, { name: "Gold", n: 25 }, { name: "Platinum", n: 50 }, { name: "Titanium", n: 75 }, { name: "Ambassador", n: 100 }],
+  Hilton:   [{ name: "Silver", n: 10 }, { name: "Gold", n: 40 }, { name: "Diamond", n: 60 }],
+  Hyatt:    [{ name: "Discoverist", n: 10 }, { name: "Explorist", n: 30 }, { name: "Globalist", n: 60 }],
+  IHG:      [{ name: "Silver", n: 10 }, { name: "Gold", n: 20 }, { name: "Platinum", n: 40 }, { name: "Diamond", n: 70 }],
+  Accor:    [{ name: "Silver", n: 10 }, { name: "Gold", n: 30 }, { name: "Platinum", n: 60 }, { name: "Diamond", n: 100 }],
+};
+
+// Progress toward the next tier *this calendar year*, since loyalty
+// status resets annually. Returns { current, next, ytd, pct } or null.
+function statusProgress(brand, stays) {
+  const ladder = BRAND_TIERS[brand];
+  if (!ladder) return null;
+  const year = new Date().getFullYear();
+  const yearStart = `${year}-01-01`;
+  const ytd = stays
+    .filter((s) => s.status === "past" && s.checkIn && s.checkIn >= yearStart)
+    .filter((s) => detectBrand(s.hotel) === brand)
+    .reduce((n, s) => n + (s.nights || 0), 0);
+  // The "current" tier is the highest threshold YTD has crossed.
+  let current = null;
+  for (const t of ladder) if (ytd >= t.n) current = t;
+  // The "next" tier is the first one above YTD.
+  const next = ladder.find((t) => t.n > ytd);
+  if (!next) return { current, next: null, ytd, pct: 100, nightsToNext: 0 };
+  const prevN = current?.n || 0;
+  const span = Math.max(1, next.n - prevN);
+  const pct = Math.min(100, Math.round(((ytd - prevN) / span) * 100));
+  return { current, next, ytd, pct, nightsToNext: next.n - ytd };
+}
+
 function BarChart({ data, color, labelWidth = 80 }) {
   const max = Math.max(...Object.values(data), 1);
   return Object.entries(data).sort(([, a], [, b]) => b - a).map(([label, value]) => (
@@ -31,6 +69,56 @@ function BarChart({ data, color, labelWidth = 80 }) {
       {value <= 1 && <span style={{ font: "11px var(--font-mono)", color: "var(--text-dim)" }}>{value}</span>}
     </div>
   ));
+}
+
+// Brand-aware variant of ExpandableList: shows the same nights tally
+// but adds a passive "X nights to Gold" progress bar under any row
+// whose brand we know the loyalty ladder for. Independent / boutique
+// rows render as plain rows — no fake status to chase.
+function BrandsList({ items, allStays }) {
+  const [expanded, setExpanded] = useState(false);
+  const display = expanded ? items : items.slice(0, 5);
+  return (
+    <div className="chart-section">
+      <div className="chart-title">🏨 Brands ({items.length})</div>
+      {display.map(([name, val], i) => {
+        const sp = statusProgress(name, allStays);
+        return (
+          <div key={name} style={{
+            padding: "10px 0",
+            borderBottom: i < display.length - 1 ? "1px solid var(--border)" : "none",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ font: "14px var(--font-sans)", color: "var(--text)" }}>
+                {name}
+                {sp?.current && <span style={{ marginLeft: 8, font: "600 9px var(--font-mono)", color: "var(--accent)", textTransform: "uppercase", letterSpacing: 1 }}>{sp.current.name}</span>}
+              </span>
+              <span style={{ font: "600 13px var(--font-mono)", color: "var(--text-secondary)" }}>{val} nights</span>
+            </div>
+            {sp?.next && (
+              <div className="brand-tier-progress">
+                <div className="brand-tier-track">
+                  <div className="brand-tier-fill" style={{ width: `${sp.pct}%` }} />
+                </div>
+                <div className="brand-tier-meta">
+                  {sp.nightsToNext} night{sp.nightsToNext !== 1 ? "s" : ""} to {sp.next.name}
+                  <span className="brand-tier-meta-dim"> · {sp.ytd}/{sp.next.n} this year</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {items.length > 5 && (
+        <button onClick={() => setExpanded(!expanded)} style={{
+          marginTop: 8, background: "none", border: "none", color: "var(--accent)",
+          font: "500 13px var(--font-sans)", cursor: "pointer", padding: 0,
+        }}>
+          {expanded ? "Show less" : `View all ${items.length} →`}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function ExpandableList({ title, emoji, items, unit }) {
@@ -253,8 +341,9 @@ export default function StatsView({ stays }) {
       {/* Brand affinity — every unique brand is shown so single-stay
           boutique properties get visibility too, not just the top-N
           chains. Ranked by total nights stayed (loyalty by depth, not
-          booking volume). */}
-      {brandSorted.length > 0 && <ExpandableList title="Brands" emoji="🏨" items={brandSorted} unit="nights" />}
+          booking volume). For known programs, BrandsList tucks a
+          passive "X nights to next tier" bar under each row. */}
+      {brandSorted.length > 0 && <BrandsList items={brandSorted} allStays={stays} />}
 
       {/* Nights by Year */}
       {Object.keys(byYear).length > 0 && (

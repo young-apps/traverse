@@ -13,6 +13,7 @@
 import { lazy, Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import StayCard from "./StayCard";
 import BottomSheet from "./BottomSheet";
+import HomeHighlights from "./HomeHighlights";
 import { tap as hapticTap } from "../services/haptics";
 
 const MapView = lazy(() => import("./MapView"));
@@ -71,6 +72,10 @@ export default function MapHome({
           <MapView stays={stays} selectedId={selectedId} onSelect={onSelect}
             celebrateAt={celebrate} paddingBottom={drawerPx} />
         </Suspense>
+        {/* Floating storyteller card — ambient YTD highlights that
+            rotate every few seconds. Kept above the map, hidden when
+            there's nothing meaningful to show. */}
+        <HomeHighlights stays={stays} />
       </div>
 
       <BottomSheet

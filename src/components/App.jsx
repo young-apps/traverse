@@ -188,7 +188,7 @@ function Dashboard({ user }) {
       </nav>
 
       {showAdd && <AddStayModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
-      {editStay && <EditStayModal stay={editStay} onClose={() => setEditStay(null)} onSave={handleEdit} />}
+      {editStay && <EditStayModal stay={editStay} onClose={() => setEditStay(null)} onSave={handleEdit} friends={friends} friendStays={friendStays} />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // EditStayModal — edit all stay fields
 import { useState, useMemo } from "react";
 import DateRangePicker from "./DateRangePicker";
+import FriendActivity from "./FriendActivity";
 import { ROOM_TYPES, BED_TYPES, VIEW_TYPES, CLUB_ACCESS, UPGRADE_STATUS, BOOKING_SOURCES, TRIP_PURPOSES } from "../constants";
 
 function ChipPicker({ options, value, onChange, label }) {
@@ -20,7 +21,7 @@ function ChipPicker({ options, value, onChange, label }) {
   </>);
 }
 
-export default function EditStayModal({ stay, onClose, onSave }) {
+export default function EditStayModal({ stay, onClose, onSave, friends = [], friendStays = {} }) {
   const [checkIn, setCI] = useState(stay.checkIn || "");
   const [checkOut, setCO] = useState(stay.checkOut || "");
   const [notes, setN] = useState(stay.notes || "");
@@ -105,6 +106,11 @@ export default function EditStayModal({ stay, onClose, onSave }) {
           <textarea className="field-input" rows={2} value={notes} onChange={(e) => setN(e.target.value)} style={{ resize: "vertical", marginBottom: 20 }} />
 
           <button className="btn-submit" onClick={handleSave}>Save Changes</button>
+
+          {/* Contextual social signal — only renders when a friend
+              has stayed at this same hotel. Silent otherwise so the
+              modal doesn't grow a permanent empty section. */}
+          <FriendActivity stay={stay} friends={friends} friendStays={friendStays} />
         </div>
       </div>
     </div>
