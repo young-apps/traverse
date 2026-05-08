@@ -44,7 +44,42 @@ function formatError(e) {
   ].join("");
 }
 
+// Detect "stale SPA shell" errors: a deploy replaced chunk hashes, but
+// the user's browser still has the old index.html cached, so when React
+// tries to lazy-load a chunk (e.g. FriendsMapView), the old hash 404s.
+// Symptoms: "Importing a module script failed", "Failed to fetch
+// dynamically imported module", "Loading chunk N failed".
+//
+// Recovery: hard-reload once with a cache-busting query string. Use
+// sessionStorage as a one-shot guard so a genuine bug doesn't loop.
+const STALE_SHELL_KEY = "__traverse_stale_reload";
+const STALE_PATTERNS = [
+  /Importing a module script failed/i,
+  /Failed to fetch dynamically imported module/i,
+  /Loading chunk [\w-]+ failed/i,
+  /error loading dynamically imported module/i,
+];
+function isStaleChunkError(msg) {
+  return typeof msg === "string" && STALE_PATTERNS.some((p) => p.test(msg));
+}
+function maybeReloadForStaleShell(msg) {
+  if (!isStaleChunkError(msg)) return false;
+  if (sessionStorage.getItem(STALE_SHELL_KEY)) return false; // already tried
+  sessionStorage.setItem(STALE_SHELL_KEY, String(Date.now()));
+  // Cache-bust by adding a timestamp; the SW or CDN edge will serve a
+  // fresh index.html which references the new chunk hashes.
+  const url = new URL(window.location.href);
+  url.searchParams.set("_v", String(Date.now()));
+  window.location.replace(url.toString());
+  return true;
+}
+// Clear the guard once the app has been alive for ~10s — if we got
+// this far without crashing again, the reload succeeded.
+setTimeout(() => sessionStorage.removeItem(STALE_SHELL_KEY), 10_000);
+
 window.addEventListener("error", (e) => {
+  const msg = e.error?.message || e.message || "";
+  if (maybeReloadForStaleShell(msg)) return;
   const detail = e.error
     ? formatError(e.error)
     : `${e.message || "(no message — likely cross-origin script error)"}` +
@@ -53,6 +88,8 @@ window.addEventListener("error", (e) => {
   showError("Runtime error", detail);
 });
 window.addEventListener("unhandledrejection", (e) => {
+  const msg = e.reason?.message || String(e.reason || "");
+  if (maybeReloadForStaleShell(msg)) return;
   showError("Promise rejection", formatError(e.reason) || String(e.reason));
 });
 
