@@ -35,6 +35,74 @@ function showError(title, detail) {
   overlay.appendChild(block);
 }
 
+// Friendly fatal-error screen. Shown when the app cannot start at all
+// (missing env vars, module import failure). Replaces the raw stack
+// dump with a calm message and a Refresh button. The technical detail
+// is appended in small grey text only when debug mode is on, so I can
+// still triage from a TestFlight device with ?debug=1 — but a real
+// user just sees plain English plus an actionable button.
+function showFatalScreen(detail) {
+  let overlay = document.getElementById(OVERLAY_ID);
+  if (overlay) overlay.remove();
+  overlay = document.createElement("div");
+  overlay.id = OVERLAY_ID;
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;padding:32px;" +
+    "font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" +
+    "color:#0F172A;background:#F8FAFC;display:flex;flex-direction:column;" +
+    "align-items:center;justify-content:center;text-align:center;" +
+    "box-sizing:border-box;overflow:auto;";
+
+  const dot = document.createElement("div");
+  dot.style.cssText =
+    "width:14px;height:14px;border-radius:50%;background:#4F46E5;" +
+    "margin-bottom:20px;box-shadow:0 0 0 6px rgba(79,70,229,.12);";
+
+  const title = document.createElement("div");
+  title.style.cssText = "font-weight:600;font-size:18px;margin-bottom:8px;color:#0F172A;";
+  title.textContent = "Your app experienced an error";
+
+  const body = document.createElement("div");
+  body.style.cssText = "max-width:320px;color:#475569;margin-bottom:24px;";
+  body.textContent =
+    "Please refresh or try again later. If this continues, please contact support.";
+
+  const refresh = document.createElement("button");
+  refresh.textContent = "Refresh";
+  refresh.style.cssText =
+    "appearance:none;border:none;cursor:pointer;padding:12px 28px;" +
+    "border-radius:999px;background:#4F46E5;color:#fff;" +
+    "font:600 14px -apple-system,sans-serif;" +
+    "box-shadow:0 4px 14px rgba(79,70,229,.25);" +
+    "-webkit-tap-highlight-color:transparent;";
+  refresh.onclick = () => {
+    // Cache-bust to dodge a stale chunk caching us into the same crash.
+    const url = new URL(window.location.href);
+    url.searchParams.set("_v", String(Date.now()));
+    window.location.replace(url.toString());
+  };
+
+  overlay.appendChild(dot);
+  overlay.appendChild(title);
+  overlay.appendChild(body);
+  overlay.appendChild(refresh);
+
+  // Debug-only: append the technical detail in muted text, behind the
+  // same ?debug=1 gate as the runtime overlay. End users never see
+  // this; I do, when I flip the flag in TestFlight.
+  if (isDebugOverlayEnabled() && detail) {
+    const pre = document.createElement("pre");
+    pre.style.cssText =
+      "margin-top:32px;max-width:100%;white-space:pre-wrap;" +
+      "word-break:break-word;background:#E2E8F0;padding:12px;" +
+      "border-radius:8px;font:11px ui-monospace,monospace;color:#475569;";
+    pre.textContent = detail;
+    overlay.appendChild(pre);
+  }
+
+  document.body.appendChild(overlay);
+}
+
 function formatError(e) {
   if (!e) return "(no error object)";
   return [
@@ -157,10 +225,9 @@ window.addEventListener("unhandledrejection", (e) => {
   ].filter((k) => !import.meta.env[k]);
 
   if (missing.length) {
-    showError(
-      "Missing env vars at build time",
-      "These VITE_* variables were empty when the app was built:\n\n" +
-        missing.join("\n")
+    console.error("[traverse] missing env vars:", missing);
+    showFatalScreen(
+      "Missing env vars at build time:\n\n" + missing.join("\n")
     );
     return;
   }
@@ -177,6 +244,7 @@ window.addEventListener("unhandledrejection", (e) => {
     // that doesn't occur in production builds.
     createRoot(document.getElementById("root")).render(<App />);
   } catch (e) {
-    showError("Module load failed", formatError(e));
+    console.error("[traverse] module load failed:", e);
+    showFatalScreen(formatError(e));
   }
 })();
