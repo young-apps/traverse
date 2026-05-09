@@ -322,10 +322,10 @@ export default function AddStayModal({ onClose, onAdd }) {
   // ─── Navigation ─────────────────────────────────────────────────
   const stepBody = step === 1 ? Step1 : step === 2 ? Step2 : Step3;
 
+  // Tap-outside intentionally does NOT close — users were treating the
+  // gray overlay like a no-op and losing partially-typed stays. Closing
+  // has to be deliberate (Cancel button or backswipe).
   return (
-    {/* Tap-outside intentionally does NOT close — users were treating
-        the gray overlay like a no-op and losing partially-typed stays.
-        Closing has to be deliberate (Cancel button or backswipe). */}
     <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head wizard-head">
