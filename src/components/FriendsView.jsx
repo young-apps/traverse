@@ -92,8 +92,19 @@ export default function FriendsView({ user, friends, requests, friendStays, onRe
       setSearchQuery(""); setSearchResults([]);
     } catch (e) {
       console.error("Send request error:", e);
-      if (e.code === "permission-denied") setError("Permission denied. Update your Firestore rules (see README).");
-      else setError(`Failed: ${e.message || "Unknown error"}`);
+      // permission-denied here almost always means there's already a
+      // pending request to this person (Firestore rules block re-writes
+      // to an existing friendRequest doc). Surfacing the raw "Update
+      // your Firestore rules" string scared beta testers — show a
+      // human-readable explanation that maps to the most common cause.
+      if (e.code === "permission-denied") {
+        const who = profile.displayName || profile.email || "this person";
+        setError(`A request to ${who} is already pending — wait for them to accept.`);
+      } else if (e.code === "already-exists") {
+        setError("You've already sent this request.");
+      } else {
+        setError(`Failed: ${e.message || "Unknown error"}`);
+      }
     }
   };
 

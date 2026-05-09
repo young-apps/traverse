@@ -26,9 +26,37 @@ const fmtShort = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US"
 //
 // Empty state stays text-only because that's the moment we want to
 // drive the "Add your first stay" CTA, not preview a non-existent one.
-function PeekCard({ stays, upcoming, past }) {
+function PeekCard({ stays, upcoming, past, onAdd }) {
   if (!stays.length) {
-    return <span className="bottom-sheet-summary">No stays yet — tap to add</span>;
+    // First-run CTA lives directly on the peek so the user does not
+    // have to discover that the drawer drags up to expose the empty
+    // hero. Tapping anywhere on the peek (the BottomSheet handle
+    // included) still expands; this button short-circuits that and
+    // jumps straight to the add flow — which is what they want.
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onAdd?.(); }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          width: "100%",
+          padding: "12px 16px",
+          borderRadius: 12,
+          border: "none",
+          background: "var(--accent, #B8860B)",
+          color: "#fff",
+          font: "600 14px var(--font-sans)",
+          cursor: "pointer",
+          WebkitTapHighlightColor: "transparent",
+          boxShadow: "0 4px 14px rgba(184,134,11,.25)",
+        }}
+      >
+        <span style={{ font: "700 18px var(--font-sans)", lineHeight: 1 }}>+</span>
+        <span>Log Your First Stay</span>
+      </button>
+    );
   }
   const next = upcoming[0];
   const last = past[0];
@@ -144,7 +172,7 @@ export default function MapHome({
         detent={detent}
         onDetentChange={handleDetent}
         onVisibleHeightChange={handleVisibleHeight}
-        peekContent={<PeekCard stays={stays} upcoming={upcoming} past={past} />}
+        peekContent={<PeekCard stays={stays} upcoming={upcoming} past={past} onAdd={onAdd} />}
       >
         <div className="split-list-head">
           <div className="split-list-title">

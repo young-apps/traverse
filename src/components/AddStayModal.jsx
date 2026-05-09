@@ -323,7 +323,10 @@ export default function AddStayModal({ onClose, onAdd }) {
   const stepBody = step === 1 ? Step1 : step === 2 ? Step2 : Step3;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    {/* Tap-outside intentionally does NOT close — users were treating
+        the gray overlay like a no-op and losing partially-typed stays.
+        Closing has to be deliberate (Cancel button or backswipe). */}
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head wizard-head">
           {step > 1 ? (
@@ -334,7 +337,25 @@ export default function AddStayModal({ onClose, onAdd }) {
               <span key={i} className={`wizard-dot ${i + 1 === step ? "active" : i + 1 < step ? "done" : ""}`} />
             ))}
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close">✕</button>
+          {/* "Cancel" beats a bare ✕ — beta testers were tapping the X
+              expecting it to save, then losing their entry. The text
+              label makes it unambiguous that this is a discard action;
+              the bottom button is the only path that saves. */}
+          <button
+            className="btn-text"
+            onClick={onClose}
+            aria-label="Cancel and discard this stay"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "6px 4px",
+              font: "500 14px var(--font-sans)",
+              color: "var(--text-secondary, #475569)",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
         </div>
 
         <div className="modal-body wizard-body" key={step /* re-mount to retrigger slide */}>
