@@ -229,7 +229,10 @@ export default function AddStayModal({ onClose, onAdd }) {
 
   const Step2 = (
     <div className="wizard-step">
-      <div className="wizard-prompt">What kind of trip?</div>
+      <div className="wizard-prompt">
+        What kind of trip?
+        <span style={{ marginLeft: 8, font: "500 11px var(--font-mono)", color: "var(--text-dim)", letterSpacing: ".3px", textTransform: "uppercase" }}>Optional</span>
+      </div>
       <div className="wizard-tiles">
         {TRIP_PURPOSES.map((p) => (
           <button key={p}
@@ -259,7 +262,10 @@ export default function AddStayModal({ onClose, onAdd }) {
 
   const Step3 = (
     <div className="wizard-step">
-      <div className="wizard-prompt">What did it cost?</div>
+      <div className="wizard-prompt">
+        What did it cost?
+        <span style={{ marginLeft: 8, font: "500 11px var(--font-mono)", color: "var(--text-dim)", letterSpacing: ".3px", textTransform: "uppercase" }}>Optional</span>
+      </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
         {["nightly", "total"].map((m) => (
           <button key={m} onClick={() => setCM(m)} style={{
@@ -362,18 +368,44 @@ export default function AddStayModal({ onClose, onAdd }) {
           {stepBody}
         </div>
 
+        {/* Optionality hint — appears the moment Step 1 is valid so the
+            user knows the bottom button is the only thing they need to
+            tap. Beta testers were dutifully filling out every field
+            because the wizard implied all 3 steps were required. */}
+        {step < STEP_COUNT && step1Valid && (
+          <div
+            style={{
+              padding: "6px 16px 0",
+              textAlign: "center",
+              font: "11px var(--font-mono)",
+              color: "var(--text-dim)",
+              letterSpacing: ".3px",
+            }}
+          >
+            Everything below is optional — you can save now.
+          </div>
+        )}
+
         <div className="wizard-footer">
-          {/* Skip & Save shows the moment Step 1 is valid -- the rest is optional. */}
-          {step < STEP_COUNT && step1Valid && (
-            <button
-              className="btn-secondary"
-              onClick={handleSubmit}
-              disabled={submitting}
-            >
-              {submitting ? "Saving…" : "Skip & Save"}
-            </button>
-          )}
-          {step < STEP_COUNT ? (
+          {/* Once Step 1 is valid: SAVE is the primary action. "Add
+              details" is the secondary, dimmer alternative. Previously
+              this was inverted — Continue was the prominent button and
+              Save was muted, which led testers to think they had to
+              progress through every step. */}
+          {step < STEP_COUNT && step1Valid ? (
+            <>
+              <button
+                className="btn-secondary"
+                onClick={() => setStep(step + 1)}
+                disabled={submitting}
+              >
+                Add details
+              </button>
+              <button className="btn-submit" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? "Saving…" : `Save ${nights}-night stay`}
+              </button>
+            </>
+          ) : step < STEP_COUNT ? (
             <button
               className="btn-submit"
               onClick={() => setStep(step + 1)}
@@ -385,7 +417,7 @@ export default function AddStayModal({ onClose, onAdd }) {
             </button>
           ) : (
             <button className="btn-submit" onClick={handleSubmit} disabled={!canAdd || submitting}>
-              {submitting ? "Saving…" : `Log ${nights}-Night Stay`}
+              {submitting ? "Saving…" : `Save ${nights}-night stay`}
             </button>
           )}
         </div>
