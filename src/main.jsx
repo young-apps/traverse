@@ -77,9 +77,53 @@ function maybeReloadForStaleShell(msg) {
 // this far without crashing again, the reload succeeded.
 setTimeout(() => sessionStorage.removeItem(STALE_SHELL_KEY), 10_000);
 
+// Debug overlay opt-in. The full-bleed black overlay is a developer
+// aid — it dumps stacks so I can diagnose iOS WebView issues without
+// USB debugging. Real users were seeing it for transient, non-fatal
+// rejections (e.g. a Mapbox worker callback firing after teardown,
+// "this.errorCb is not a function") and assuming the app had crashed.
+//
+// In production we silently log to console + diag instead. Power-users
+// (and me, in TestFlight) can re-enable the overlay by appending
+// ?debug=1 once — it sticks for the session via localStorage.
+const DEBUG_KEY = "__traverse_debug_overlay";
+try {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("debug") === "1") localStorage.setItem(DEBUG_KEY, "1");
+  if (params.get("debug") === "0") localStorage.removeItem(DEBUG_KEY);
+} catch {}
+const isDebugOverlayEnabled = () => {
+  try { return localStorage.getItem(DEBUG_KEY) === "1"; } catch { return false; }
+};
+
+// Errors we have decided are noise — non-fatal callbacks bubbling out
+// of native bridges or Mapbox worker teardown. We log them but never
+// show UI for them, even in debug mode, because they will keep firing
+// and only obscure real signal.
+const NOISE_PATTERNS = [
+  // Capacitor/Cordova plugin error-callback fires after the registered
+  // callback was cleared. Always benign; the plugin call already
+  // resolved or the host component already unmounted.
+  /errorCb is not a function/i,
+  /this\.errorCb/i,
+  // Mapbox GL worker tears down between style swaps and occasionally
+  // rejects a pending tile request. Map keeps rendering fine.
+  /AbortError/i,
+  /The operation was aborted/i,
+];
+const isNoise = (msg) => typeof msg === "string" && NOISE_PATTERNS.some((p) => p.test(msg));
+
 window.addEventListener("error", (e) => {
   const msg = e.error?.message || e.message || "";
   if (maybeReloadForStaleShell(msg)) return;
+  if (isNoise(msg)) {
+    console.warn("[traverse] suppressed noise error:", msg);
+    return;
+  }
+  if (!isDebugOverlayEnabled()) {
+    console.error("[traverse] runtime error:", e.error || msg);
+    return;
+  }
   const detail = e.error
     ? formatError(e.error)
     : `${e.message || "(no message — likely cross-origin script error)"}` +
@@ -90,6 +134,15 @@ window.addEventListener("error", (e) => {
 window.addEventListener("unhandledrejection", (e) => {
   const msg = e.reason?.message || String(e.reason || "");
   if (maybeReloadForStaleShell(msg)) return;
+  if (isNoise(msg)) {
+    console.warn("[traverse] suppressed noise rejection:", msg);
+    e.preventDefault?.();
+    return;
+  }
+  if (!isDebugOverlayEnabled()) {
+    console.error("[traverse] promise rejection:", e.reason);
+    return;
+  }
   showError("Promise rejection", formatError(e.reason) || String(e.reason));
 });
 
