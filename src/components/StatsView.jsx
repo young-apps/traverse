@@ -35,6 +35,16 @@ const BRAND_TIERS = {
 
 // Progress toward the next tier *this calendar year*, since loyalty
 // status resets annually. Returns { current, next, ytd, pct } or null.
+//
+// IMPORTANT: only stays the user explicitly marked as "I booked this"
+// count toward elite status. Loyalty programs only credit qualifying
+// nights when the booking is made by the member under their own account
+// — comped rooms, family-booked trips, business travel where the
+// company is the booker, or third-party OTA stays often don't qualify.
+// We err on the side of underreporting (require an opt-in) rather than
+// telling someone they're "on track for Diamond" off nights that won't
+// actually credit. Beta tester feedback: "I didn't book any of these
+// stays but it shows me on track for status."
 function statusProgress(brand, stays) {
   const ladder = BRAND_TIERS[brand];
   if (!ladder) return null;
@@ -43,6 +53,7 @@ function statusProgress(brand, stays) {
   const ytd = stays
     .filter((s) => s.status === "past" && s.checkIn && s.checkIn >= yearStart)
     .filter((s) => detectBrand(s.hotel) === brand)
+    .filter((s) => s.bookedByMe === true)
     .reduce((n, s) => n + (s.nights || 0), 0);
   // The "current" tier is the highest threshold YTD has crossed.
   let current = null;

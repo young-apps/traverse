@@ -37,6 +37,10 @@ export default function EditStayModal({ stay, onClose, onSave, friends = [], fri
   const [costPerNight, setCPN] = useState(stay.costPerNight ? String(stay.costPerNight) : "");
   const [totalCostM, setTCM] = useState(stay.totalCost && !stay.costPerNight ? String(stay.totalCost) : "");
   const [costMode, setCM] = useState(stay.costPerNight ? "nightly" : "total");
+  // Mirror AddStayModal: only stays the user affirms they personally
+  // booked count toward elite tier progress. Lets users retroactively
+  // mark legacy stays they actually did book.
+  const [bookedByMe, setBBM] = useState(stay.bookedByMe === true);
 
   const nights = useMemo(() => { if (!checkIn || !checkOut) return 0; return Math.max(0, Math.round((new Date(checkOut) - new Date(checkIn)) / 864e5)); }, [checkIn, checkOut]);
   const isPast = useMemo(() => !checkOut || checkOut < new Date().toISOString().split("T")[0], [checkOut]);
@@ -51,6 +55,7 @@ export default function EditStayModal({ stay, onClose, onSave, friends = [], fri
       bookedVia: bookedVia || null, loyaltyNumber: loyaltyNumber || null,
       costPerNight: costMode === "nightly" && costPerNight ? parseFloat(costPerNight) : null,
       totalCost: total, tripPurpose: tripPurpose || null, notes,
+      bookedByMe: bookedByMe === true,
     });
     onClose();
   };
@@ -101,6 +106,53 @@ export default function EditStayModal({ stay, onClose, onSave, friends = [], fri
 
           <label className="field-label">Loyalty Number</label>
           <input className="field-input" placeholder="e.g. Bonvoy #123456789" value={loyaltyNumber} onChange={(e) => setLN(e.target.value)} style={{ marginBottom: 14 }} />
+
+          {/* Booked-by-me opt-in — gates elite-tier progress in Insights. */}
+          <button
+            onClick={() => setBBM(!bookedByMe)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              marginBottom: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: bookedByMe ? "var(--accent-muted)" : "var(--bg-2)",
+              border: `1px solid ${bookedByMe ? "var(--accent-border)" : "var(--border)"}`,
+              borderRadius: 10,
+              cursor: "pointer",
+              textAlign: "left",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                border: `1.5px solid ${bookedByMe ? "var(--accent)" : "var(--border)"}`,
+                background: bookedByMe ? "var(--accent)" : "transparent",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                font: "700 13px var(--font-sans)",
+                lineHeight: 1,
+              }}
+            >
+              {bookedByMe ? "✓" : ""}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ font: "600 13px var(--font-sans)", color: bookedByMe ? "var(--accent)" : "var(--text)" }}>
+                I personally booked this stay
+              </div>
+              <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", marginTop: 2 }}>
+                Required for nights to count toward elite status
+              </div>
+            </div>
+          </button>
 
           <label className="field-label">Notes</label>
           <textarea className="field-input" rows={2} value={notes} onChange={(e) => setN(e.target.value)} style={{ resize: "vertical", marginBottom: 20 }} />

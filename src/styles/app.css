@@ -44,8 +44,11 @@ input::placeholder, textarea::placeholder { color: var(--text-dim); }
 .scroll-ctx-dot { color: var(--text-dim); }
 .scroll-ctx-month { color: var(--text-secondary); }
 
-/* Header */
-.header { padding: 20px 20px 12px; }
+/* Header — top padding hugs the iOS safe area so content sits below the
+   status bar without leaving an empty band when the bar is short (e.g.
+   web/PWA where the inset resolves to 0). The `max(20px, …)` floor keeps
+   web spacing intact while iOS gets the actual notch/island offset. */
+.header { padding: max(20px, calc(env(safe-area-inset-top, 0px) + 8px)) 20px 12px; }
 .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .brand-mark { font: 700 11px/1 var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: 3px; }
 .user-menu-btn { background: none; border: none; cursor: pointer; padding: 0; }

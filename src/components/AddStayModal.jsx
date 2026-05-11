@@ -77,6 +77,13 @@ export default function AddStayModal({ onClose, onAdd }) {
   const [costMode, setCM] = useState("nightly"); const [showMore, setSM] = useState(false);
   const [tripPurpose, setTP] = useState("");
   const [currency, setCurrency] = useState("USD");
+  // Whether the user personally booked this stay under their own loyalty
+  // account. Gates whether the stay's nights count toward elite tier
+  // progress in StatsView — loyalty programs only credit nights when the
+  // member is the booker. Default false: most stays in the wild are not
+  // booked by the logged-in user (corporate travel, family trips, OTA),
+  // so opting *in* is safer than defaulting on and lying about status.
+  const [bookedByMe, setBBM] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const debRef = useRef(null);
 
@@ -156,6 +163,7 @@ export default function AddStayModal({ onClose, onAdd }) {
       currency: total > 0 ? currency : null,
       totalCostUSD, fxRate, fxDate,
       tripPurpose: tripPurpose || null, notes,
+      bookedByMe: bookedByMe === true,
     });
   };
 
@@ -295,6 +303,60 @@ export default function AddStayModal({ onClose, onAdd }) {
       )}
 
       <NumericKeypad value={activeCostValue} onChange={setActiveCostValue} />
+
+      {/* Booked-by-me opt-in. Only stays the user explicitly affirms
+          they personally booked count toward elite-tier progress in
+          Insights. Default off — comped, family-paid, business-booked,
+          and OTA stays do not credit toward loyalty status, so silently
+          counting every stay would tell users they're "on track" for a
+          tier their actual program won't recognize. */}
+      {stayType === "hotel" && (
+        <button
+          onClick={() => setBBM(!bookedByMe)}
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            marginTop: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: bookedByMe ? "var(--accent-muted)" : "var(--bg-2)",
+            border: `1px solid ${bookedByMe ? "var(--accent-border)" : "var(--border)"}`,
+            borderRadius: 10,
+            cursor: "pointer",
+            textAlign: "left",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              flexShrink: 0,
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              border: `1.5px solid ${bookedByMe ? "var(--accent)" : "var(--border)"}`,
+              background: bookedByMe ? "var(--accent)" : "transparent",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              font: "700 13px var(--font-sans)",
+              lineHeight: 1,
+            }}
+          >
+            {bookedByMe ? "✓" : ""}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ font: "600 13px var(--font-sans)", color: bookedByMe ? "var(--accent)" : "var(--text)" }}>
+              I personally booked this stay
+            </div>
+            <div style={{ font: "11px var(--font-mono)", color: "var(--text-dim)", marginTop: 2 }}>
+              Required for nights to count toward elite status
+            </div>
+          </div>
+        </button>
+      )}
 
       {/* Hotel-only: room/bed/view/booking details collapsed by default. */}
       {stayType === "hotel" && (<>
